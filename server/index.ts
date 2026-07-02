@@ -47,19 +47,18 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, '../client/dist')));
+  const clientPath = path.join(process.cwd(), 'client/dist');
+
+  app.use(express.static(clientPath));
+
   app.get('*', (req, res, next) => {
     if (req.path.startsWith('/api')) {
       return next();
     }
-    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+
+    res.sendFile(path.join(clientPath, 'index.html'));
   });
 }
-
-// Basic catch-all handler for API routing errors
-app.use('/api', (req, res) => {
-  res.status(404).json({ error: 'API endpoint not found' });
-});
 
 // Centralized error handler
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
