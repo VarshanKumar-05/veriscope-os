@@ -1,0 +1,60 @@
+# Dependency folders
+node_modules/
+jspm_packages/
+web_modules/
+
+# Production builds
+dist/
+build/
+out/
+.next/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDEs and Editors
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Environment configurations
+.env
+.env.local
+.env.production
+.env.development
+.env.*.local
+
+# Diagnostic and build caches
+.eslintcache
+.cache/
+.npm/
+.parcel-cache/
+.pnpm-store/
+.tsbuildinfo
+.yarn-cache/
+.svelte-kit/
+.astro/
+.nuxt/
+.vercel/
+
+# Docker cache & dynamic local history logs
+server/history.json
+server/dist/
+client/dist/
