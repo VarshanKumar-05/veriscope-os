@@ -1,194 +1,250 @@
-# 🔭 Veriscope OS — AI Company Intelligence Workspace
+# Veriscope OS 🔭
 
-[![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![React](https://img.shields.io/badge/react-%2320232a.svg?style=for-the-badge&logo=react&logoColor=%2361DAFB)](https://react.dev/)
-[![Express.js](https://img.shields.io/badge/express.js-%23404d59.svg?style=for-the-badge&logo=express&logoColor=%2361DAFB)](https://expressjs.com/)
-[![TypeScript](https://img.shields.io/badge/typescript-%23007acc.svg?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](https://opensource.org/licenses/MIT)
+![Veriscope OS](docs/screenshot.png) *(Note: Please place your application screenshot in `docs/screenshot.png`)*
 
-Veriscope OS is a production-grade, evidence-first AI Company Intelligence Workspace. Designed as a professional analyst workbench, it features a multi-agent pipeline that compiles financial records, news sentiment, and competitive metrics for public corporations. It visualizes these findings on an interactive research canvas, offering an explainable and traceable investment rating.
+## 1. Project Overview
 
----
+**Veriscope OS** is a cutting-edge, AI-powered investment research workspace designed to analyze publicly traded companies worldwide. Built for the InsideLLM AI Investment Research Agent Assignment, Veriscope transcends traditional chatbot interfaces by offering a fully immersive, institutional-grade research platform.
 
-## 📖 Table of Contents
-* [Overview](#overview)
-* [How to Run](#how-to-run)
-* [How it Works](#how-it-works)
-* [Architecture](#architecture)
-* [AI Pipeline](#ai-pipeline)
-* [Key Design Decisions](#key-design-decisions)
-* [Technology Choices](#technology-choices)
-* [Trade-offs & Limitations](#trade-offs--limitations)
-* [Docker Instructions](#docker-instructions)
-* [Deployment Instructions](#deployment-instructions)
-* [Security & Optimizations](#security--optimizations)
-* [Folder Structure](#folder-structure)
-* [API Specifications](#api-specifications)
-* [License](#license)
+Rather than relying on hallucination-prone text generation, Veriscope acts as an autonomous financial analyst. It orchestrates a complex pipeline that ingests data from multiple verified financial sources, cross-references corporate metadata, and deploys specialized AI reasoning agents to synthesize financial health, market risks, and peer landscapes. The final output is structured as a stunning, interactive Research Canvas that visualizes the AI's investigation process and concludes with a definitive, confidence-scored investment recommendation.
+
+### The Research Workflow:
+1. **Search & Discovery**: Enter a Company Name, Ticker Symbol, or ISIN.
+2. **Data Aggregation**: The system silently fetches real-time quotes, company profiles, and global news.
+3. **AI Verification**: The Data Verification Agent cross-checks facts to eliminate hallucinations.
+4. **Agentic Reasoning**: Specialized agents (Financial, Risk, Competitor, News) process the raw data.
+5. **Synthesis**: The Decision Maker Agent formulates a final Buy/Hold/Sell rating with a Conviction Score.
+6. **Visualization**: The results are presented in a dynamic, interactive Research Canvas.
 
 ---
 
-## 🔍 Overview
+## 2. Features
 
-Veriscope OS is built for retail investors, students, analysts, and researchers performing due diligence. Rather than dumping unstructured chatbot dialogues, Veriscope operates like a professional terminal—visualizing facts as node evidence cards linked directly to conviction metrics. 
+Veriscope OS is packed with professional-grade features:
 
----
-
-## 🚀 How to Run
-
-### Prerequisite Check
-Ensure you have **Node.js (v20+)** and **npm** installed.
-
-### 1. Offline Sandbox Run (Quick Start)
-By default, the application runs in a fully functional local **Demo Sandbox Mode** with zero API keys required.
-```bash
-# 1. Clone the repository
-git clone https://github.com/your-username/veriscope-os.git
-cd veriscope-os
-
-# 2. Duplicate env config
-cp .env.example .env
-
-# 3. Boot dev servers concurrently
-npm install
-npm run dev
-```
-Open [http://localhost:5173](http://localhost:5173) in your browser.
-
-### 2. Live AI Connect Mode
-To run live searches for any public company:
-1. Open the `.env` file in the root folder.
-2. Provide your API keys:
-   ```bash
-   GEMINI_API_KEY=your_google_gemini_key_here
-   NEWS_API_KEY=your_news_api_key_here
-   TAVILY_API_KEY=your_tavily_api_key_here
-   ```
-3. Restart the dev environment: `npm run dev`.
+- **Worldwide Public Company Research**: Search and analyze any globally listed public company.
+- **Intelligent Search**: Find companies using their Official Legal Name, partial name, Ticker Symbol, or ISIN.
+- **Executive Summary**: Get a quick, AI-generated snapshot of the company's business model and leadership.
+- **Research Canvas**: A beautiful, interactive node-based graph (powered by React Flow) that maps out the AI's logic, complete with glowing neural-network connection wires and interactive evidence cards.
+- **Financial Analytics**: Deep dive into 18+ verified financial metrics (EBITDA, ROA, ROE, Margins) complete with data visualizations.
+- **News Sentiment**: Real-time analysis of the latest global news headlines, categorizing sentiment as positive, neutral, or negative.
+- **Peer Landscape**: AI-identified competitors with direct strength/weakness comparisons.
+- **Risk Heatmap**: A categorized breakdown of regulatory, economic, and technological risks with severity scoring.
+- **AI Investment Recommendation**: A definitive Buy, Hold, or Sell rating.
+- **Confidence Score**: A transparent conviction index (0-100%) indicating the AI's certainty based on data availability and consistency.
+- **Evidence Verification**: Strict anti-hallucination protocols that flag unavailable data instead of guessing.
+- **Watchlist**: Pin your favorite research reports to the sidebar for quick access.
+- **Export Professional PDF Report**: Generate clean, print-ready PDF tearsheets of your research.
+- **Dark Mode / Light Mode**: Beautiful UI tailored to your preferences, featuring an "AI Blueprint" aesthetic in dark mode.
+- **Responsive Design**: Flawlessly adapts to desktops, tablets, and modern web environments.
 
 ---
 
-## 🛠️ How it Works
+## 3. Technology Stack
 
-1. **Query Entry**: Users input a company ticker (e.g. `AAPL`) or general company name (e.g. `Microsoft`).
-2. **Auto-Normalizer**: An intelligent router maps keywords to valid tickers.
-3. **Evidence Harvesting**: Specialized agents scrape financials, media channels, and peer indicators.
-4. **Adversarial Critique**: A dedicated risk evaluator searches for supply chain bottlenecks and margin compression risks.
-5. **Rating Assessment**: The recommendation engine synthesizes evidence, assigning confidence scores.
-6. **Canvas Layout**: Claims populate React Flow nodes linked dynamically by edge flows corresponding to category types.
+**Frontend**
+- React
+- TypeScript
+- Tailwind CSS
+- React Flow (for the Research Canvas)
+- Recharts (for Financial Data Visualization)
+
+**Backend**
+- Node.js
+- Express
+- TypeScript
+
+**Artificial Intelligence**
+- Google Gemini (gemini-3.1-flash-lite via official SDK)
+- Structured AI Reasoning & Agentic Pipelines
+
+**Financial Data APIs**
+- Yahoo Finance (via `yahoo-finance2`)
+- Finnhub
+- Alpha Vantage
+- Polygon.io
+
+**Search & News**
+- Tavily Search API
+- NewsAPI (with robust RSS Fallbacks)
+
+**Deployment**
+- Docker
+- Render
 
 ---
 
-## 🏗️ Architecture
+## 4. Architecture
 
-Veriscope OS separates visual presentation layers from agent graph layers:
-* **Frontend Client**: Multi-tab workspace detailing conviction matrices, financial margins, chart histories (Recharts), news pie distributions, and competitive spreadsheets.
-* **Backend Coordinator**: Executes graph workflows using **LangGraph** concepts.
-* **Shared Schemas**: A central interface definition guarantees typescript validation across both spaces.
-
-Detailed architectural charts are available in [Architecture.md](file:///d:/placements/insideLLM/docs/Architecture.md).
-
----
-
-## 🤖 AI Pipeline
+Veriscope OS employs a multi-stage, agentic pipeline:
 
 ```text
-[Planner Agent] ──> [Financial Agent] (Balance sheets, margins)
-                 ──> [News Agent] (Media sentiment indices)
-                 ──> [Competitor Agent] (Multiple valuation maps)
-                 ──> [Adversarial Risk Agent] (Vulnerabilities, headwinds)
-                       │
-                       └──> [Recommendation Synthesizer] ──> [Focal Decision Card]
+User Input (Name, Ticker, ISIN)
+       ↓
+Company Resolver (Maps input to canonical ticker via Yahoo Finance/Search)
+       ↓
+Ticker Verification (Ensures the asset is a valid, publicly traded equity)
+       ↓
+Financial Data Collection (Parallel fetching from Yahoo, Finnhub, etc.)
+       ↓
+News Collection (NewsAPI / Google News RSS)
+       ↓
+AI Research Engine (Parallel execution of specialized LLM Agents)
+       ↓
+Evidence Verification (Cross-referencing to eliminate hallucinations)
+       ↓
+Executive Summary Generation
+       ↓
+Research Canvas Rendering (Interactive React Flow Graph)
+       ↓
+Financial Analytics Processing (Data formatting and Charting)
+       ↓
+Final Investment Recommendation & Conviction Scoring
+       ↓
+Professional PDF Export
 ```
 
-* **Live Mode**: Google Gemini or OpenAI GPT models query APIs in a structured state machine.
-* **Sandbox Mode**: Implements a JavaScript `Proxy` that generates stable, character-seeded mock outputs for **any arbitrary company stock**, ensuring offline capability.
-
 ---
 
-## 🎯 Key Design Decisions
+## 5. Installation
 
-* **Evidence-First UI**: Bypassed conversational text feeds. Every claim is mapped to a clickable node detailing its source and confidence score.
-* **Aurora Blueprint Theme**: Tailored a minimalist, contrast-rich grid system using global design variable tokens.
-* **State Graph Persistence**: Research histories are saved to local log files, preventing data loss during node rebuilds.
+### Prerequisites
+- Node.js (v18 or higher)
+- npm or yarn
+- Git
 
----
+### Setup Instructions
 
-## 💻 Technology Choices
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/VarshanKumar-05/veriscope-os.git
+   cd veriscope-os
+   ```
 
-* **Why React**: Single-page application renders, quick states transitions, and clean Component models.
-* **Why Express**: Lightweight Node.js server optimal for serving compiled static files.
-* **Why Docker**: Containerized multi-stage pipelines guarantee consistency across staging and production.
-* **Why React Flow**: Best-in-class canvas visualizer for interactive edge maps and custom nodes.
+2. **Install dependencies**
+   ```bash
+   npm run install:all
+   ```
+   *(Or manually run `npm install` in the root, `client`, and `server` directories).*
 
----
+3. **Configure environment variables**
+   Copy the example environment file and fill in your API keys:
+   ```bash
+   cp .env.example .env
+   ```
 
-## ⚖️ Trade-offs & Limitations
+4. **Run the Backend (Development)**
+   ```bash
+   npm run dev:server
+   ```
 
-* **Synchronous Build Wait**: Compiling multi-source live API calls requires ~10-15 seconds. (Mitigated using real-time log loaders).
-* **Vite Environment Compiling**: Vite variables are baked in at build time, requiring frontend rebuilds when changing backend URLs.
+5. **Run the Frontend (Development)**
+   ```bash
+   npm run dev:client
+   ```
+   *(Or run both simultaneously from the root using `npm run dev` if configured).*
 
----
-
-## 🐳 Docker Instructions
-
-Build and boot the services in containerized isolation:
+### Docker Instructions
+If you prefer running the application in a containerized environment:
 ```bash
-# Compile and boot all services
-docker compose up --build
-
-# Stop the services
-docker compose down -v
+docker-compose up --build
 ```
-Exposed ports:
-* Frontend Client: [http://localhost:5173](http://localhost:5173)
-* Backend Server: [http://localhost:5000/health](http://localhost:5000/health)
-
-Detailed Docker structures are described in [Docker.md](file:///d:/placements/insideLLM/docs/Docker.md).
+This will spin up both the frontend and backend services automatically.
 
 ---
 
-## 📦 Deployment Instructions
+## 6. Environment Variables
 
-### Render (Backend & Client Hosting)
-Deploy our multi-stage unified [Dockerfile](file:///d:/placements/insideLLM/Dockerfile):
-1. Create a **Web Service** on Render pointing to your repo.
-2. Select runtime **Docker**.
-3. Set environment variable `NODE_ENV=production`.
+To fully utilize the platform, configure the following variables in your `.env` file:
 
-### Vercel (Frontend Static Hosting)
-1. Import the `./client` subdirectory.
-2. Select **Vite** preset.
-3. Configure the build-time env variable `VITE_API_URL` to point to your backend Render instance.
+- `GEMINI_API_KEY`: **(Required)** Used to power the core AI reasoning, Data Verification, News Sentiment, Risk Analysis, and Decision Making agents.
+- `TAVILY_API_KEY`: *(Optional)* Used for advanced web search fallback when standard financial APIs lack specific corporate context.
+- `NEWS_API_KEY`: *(Optional)* Used to fetch the latest global news articles for the News Sentiment agent. (Falls back to Google News RSS if missing).
+- `FINNHUB_API_KEY`: *(Optional)* Used to fetch institutional-grade corporate profiles and verify exact legal company names.
+- `ALPHA_VANTAGE_API_KEY`: *(Optional)* Used as a secondary source for financial metrics and historical data.
+- `POLYGON_API_KEY`: *(Optional)* Used for real-time market data and ticker resolution.
 
-Detailed guidelines are compiled in [Deployment.md](file:///d:/placements/insideLLM/docs/Deployment.md).
+*Note: The system is designed to gracefully degrade. If premium financial APIs are missing, it falls back to free providers (like Yahoo Finance) and RSS feeds.*
 
 ---
 
-## 🔒 Security & Optimizations
+## 7. API Integrations
 
-* **Secret Isolation**: All credentials run server-side and are never compiled into client bundles.
-* **CORS Safe-Listing**: Configured environment-driven origins limits.
-* **Static Assets Caching**: Nginx serves index folders with compressed asset packaging.
-
----
-
-## 📂 Folder Structure
-
-The directory organization is documented in [FolderStructure.md](file:///d:/placements/insideLLM/docs/FolderStructure.md).
+- **Google Gemini**: The brain of the operation. Parses raw JSON data from financial APIs and returns structured TypeScript interfaces (`JSON`) containing risk assessments, sentiment analysis, and investment ratings.
+- **Yahoo Finance**: The primary workhorse for real-time stock quotes, basic company profiles, and market overview data.
+- **Finnhub**: Used as a secondary verification layer to confirm official legal company names, industry classifications, and headquarters locations.
+- **Google News RSS**: Provides a free, highly reliable stream of recent news articles for the Sentiment Agent to analyze when premium news APIs are unavailable.
 
 ---
 
-## 📡 API Specifications
+## 8. Design Decisions
 
-Complete route details and payload shapes are documented in [API.md](file:///d:/placements/insideLLM/docs/API.md).
+- **Why React Flow was chosen**: Standard dashboards with stacked cards are boring. React Flow allows us to visually demonstrate the AI's "thought process" using nodes and connecting wires, giving users a tangible sense of how the evidence leads to the final recommendation.
+- **Why Gemini was selected**: Gemini offers incredible speed (Flash Lite), large context windows, and highly reliable structured JSON output, which is strictly required for programmatic rendering of the React Flow canvas.
+- **Why multiple financial APIs are combined**: Financial data is famously fragmented. By combining Yahoo Finance and Finnhub, we achieve global coverage and cross-reference data points to ensure accuracy.
+- **Why evidence verification is used**: LLMs are prone to hallucinations, especially with numbers. Our Data Verification Agent acts as a strict firewall—if a metric isn't found in the raw API payloads, the AI is instructed to return "Verified information unavailable" rather than guessing.
+- **Why confidence scoring exists**: Financial markets are probabilistic. The Conviction Index provides transparency, letting the user know how much faith the AI places in its own recommendation based on data quality and market volatility.
 
 ---
 
-## 📄 License
+## 9. Trade-offs
+
+- **Free API Rate Limits**: The platform relies heavily on free tiers of financial APIs (like Yahoo Finance). During heavy usage, rate limits (`429 Too Many Requests`) may occasionally cause data retrieval to fail or fall back to cached data.
+- **Private Company Information**: The system is exclusively built for publicly traded equities. It cannot analyze private companies, startups, or assets without a public ticker.
+- **Market Data Latency**: Data is slightly delayed (typically 15 minutes) as per standard free API tier restrictions, making this unsuitable for high-frequency day trading.
+- **Fallback Mechanisms**: If the LLM fails to parse its own JSON or an API goes down, the system uses mock data or cached history to ensure the UI doesn't crash, trading real-time accuracy for application stability.
+
+---
+
+## 10. Example Companies
+
+Try searching for these companies to see Veriscope OS in action:
+
+- **NVIDIA** (High growth, AI sector dynamics)
+- **Apple** (Stable blue-chip, massive revenue)
+- **IBM** (Legacy tech, dividend focus)
+- **Microsoft** (Cloud dominance)
+- **Alphabet** (Search and advertising metrics)
+- **Tesla** (High volatility, sentiment-driven)
+- **Tech Mahindra** (Indian IT sector)
+- **TCS** (Tata Consultancy Services)
+- **Reliance Industries** (Conglomerate analysis)
+- **JPMorgan Chase** (Financial sector metrics)
+
+---
+
+## 11. Future Improvements
+
+While Veriscope OS is highly capable, the roadmap includes:
+
+- **SEC Filing Analysis**: Direct ingestion and semantic search of 10-K and 10-Q filings.
+- **Portfolio Optimizer**: Analyzing correlation and risk across a basket of generated reports.
+- **Monte Carlo Simulation**: Probability modeling for future price action.
+- **DCF Valuation**: Automated Discounted Cash Flow models based on analyst growth estimates.
+- **Institutional Ownership**: Tracking hedge fund and insider buying/selling trends.
+- **Insider Transactions**: Real-time alerts on C-suite stock sales.
+- **Economic Indicators**: Correlating company performance with macro data (CPI, Interest Rates).
+- **AI Portfolio Assistant**: A conversational chat interface to query your saved research reports.
+- **Historical Timeline**: Visualizing company milestones and historical ratings over time.
+- **Multi-Agent Debate**: Spawning multiple AI agents with different investment philosophies (e.g., Value vs. Growth) to debate the stock before issuing a final recommendation.
+
+---
+
+## 12. Folder Structure
+
+- `/client`: Contains the React/Vite frontend application.
+  - `/src/pages`: Main views (`LandingPage.tsx`, `Dashboard.tsx`).
+  - `/src/layout`: Shell components (`Layout.tsx`, navigation, sidebar).
+  - `/src/components`: Reusable UI components (Charts, Nodes).
+- `/server`: Contains the Node.js/Express backend API.
+  - `/routes`: Express API endpoints (`/api/research`, `/api/market-overview`).
+  - `/services`: Core business logic (`llm.ts`, `yfinance.ts`, `discovery.ts`).
+  - `/graph`: The LangGraph/StateGraph execution engine coordinating the AI agents.
+- `/shared`: Contains shared TypeScript interfaces used by both the frontend and backend to ensure type safety.
+- `/docs`: Contains screenshots, diagrams, and project documentation assets.
+
+---
+
+## 13. License
+
 This project is licensed under the MIT License - see the LICENSE file for details.
-
----
-
-## ✍️ Author
-Developed by the Veriscope OS Project Maintainers. Submitted for the AI Engineering Major Project Requirement.
