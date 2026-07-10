@@ -805,7 +805,7 @@ const eventSource = new EventSource(
               onEdgesChange={onEdgesChange}
               nodeTypes={nodeTypes}
               colorMode={theme}
-              defaultEdgeOptions={{ animated: true, type: 'smoothstep' }}
+              defaultEdgeOptions={{ animated: true, type: 'default' }}
               fitView
               fitViewOptions={{ padding: 0.15 }}
               minZoom={0.2}
@@ -814,7 +814,7 @@ const eventSource = new EventSource(
               panOnDrag={true}
               proOptions={{ hideAttribution: true }}
             >
-              <Background gap={20} size={1} color={theme === 'dark' ? '#334155' : '#e2e8f0'} />
+              <Background gap={24} size={1.5} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : '#e2e8f0'} />
               <Controls position="bottom-right" className="bg-white dark:bg-slate-900 shadow-md border border-slate-200 dark:border-slate-800 fill-slate-700 dark:fill-slate-300" />
               <MiniMap 
                 nodeColor={(node) => {
