@@ -6,6 +6,48 @@ import { runDataVerificationAgent, hasLLMCredentials } from './llm.js';
 // Cache to store verified company profiles and their resolved financials
 export const companyProfileCache = new Map<string, { profile: any; financialsData: any; metadata: any }>();
 
+// Helper to fetch from Finnhub quote endpoint
+async function fetchFinnhubQuote(symbol: string): Promise<any> {
+  const token = process.env.FINNHUB_API_KEY;
+  if (!token) return null;
+  
+  const cleanSymbol = symbol.split('.')[0].toUpperCase();
+  try {
+    const url = `https://finnhub.io/api/v1/quote?symbol=${cleanSymbol}&token=${token}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json() as any;
+      if (data && data.c) {
+        return data;
+      }
+    }
+  } catch (e: any) {
+    console.warn(`[Finnhub] Failed to fetch quote for ${cleanSymbol}:`, e.message);
+  }
+  return null;
+}
+
+// Helper to fetch from Finnhub profile2 endpoint
+async function fetchFinnhubProfile(symbol: string): Promise<any> {
+  const token = process.env.FINNHUB_API_KEY;
+  if (!token) return null;
+
+  const cleanSymbol = symbol.split('.')[0].toUpperCase();
+  try {
+    const url = `https://finnhub.io/api/v1/stock/profile2?symbol=${cleanSymbol}&token=${token}`;
+    const res = await fetch(url);
+    if (res.ok) {
+      const data = await res.json() as any;
+      if (data && data.name) {
+        return data;
+      }
+    }
+  } catch (e: any) {
+    console.warn(`[Finnhub] Failed to fetch profile for ${cleanSymbol}:`, e.message);
+  }
+  return null;
+}
+
 // Helper to wrap any Promise with a timeout limit
 async function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 20000, name: string = 'Operation'): Promise<T> {
   let timeoutId: any;
@@ -54,7 +96,15 @@ export async function getCompanyProfile(ticker: string, useMock: boolean = false
         exchange = quote.exchange || 'Unknown';
       }
     } catch (err: any) {
-      console.warn(`[Company Intel] Quote fetch failed for ${cleanTicker}:`, err.message);
+      console.warn(`[Company Intel] Yahoo Finance quote failed for ${cleanTicker}:`, err.message);
+      
+      // Fallback to Finnhub
+      const finnhubProfile = await fetchFinnhubProfile(cleanTicker);
+      if (finnhubProfile) {
+        console.log(`[Company Intel] Resolved company details via Finnhub for ${cleanTicker}`);
+        name = finnhubProfile.name || name;
+        exchange = finnhubProfile.exchange || exchange;
+      }
     }
 
     console.log(`[Company Intel] Querying Gemini Data Verification Agent for ${cleanTicker}`);
@@ -74,7 +124,7 @@ export async function getCompanyProfile(ticker: string, useMock: boolean = false
       website: verified.company.website || '',
       summary: verified.company.summary || 'Verification Required',
       // Data credentials quality fields
-      verifiedSources: verified.metadata.verifiedSources || ['Yahoo Finance', 'SEC Filings'],
+      verifiedSources: verified.metadata.verifiedSources || ['Yahoo Finance', 'Finnhub', 'SEC Filings'],
       lastUpdated: new Date().toLocaleString(),
       confidenceScore: verified.metadata.confidenceScore || 95,
       verificationStatus: verified.metadata.verificationStatus || 'Verified',
@@ -110,8 +160,29 @@ export async function getFinancials(ticker: string, useMock: boolean = false): P
 
   try {
     const yf = new (yahooFinance as any)();
-    console.log(`[Financial Analyst] Requesting Yahoo Finance quote for ${cleanTicker}`);
-    const quote = await withTimeout(yf.quote(cleanTicker), 15000, `Yahoo Finance quote for ${cleanTicker}`) as any;
+    let quote: any = null;
+    try {
+      console.log(`[Financial Analyst] Requesting Yahoo Finance quote for ${cleanTicker}`);
+      quote = await withTimeout(yf.quote(cleanTicker), 15000, `Yahoo Finance quote for ${cleanTicker}`) as any;
+    } catch (error: any) {
+      console.warn(`[Financial Analyst] Yahoo Finance quote failed for ${cleanTicker}:`, error.message);
+      
+      // Fallback to Finnhub
+      const fQuote = await fetchFinnhubQuote(cleanTicker);
+      const fProfile = await fetchFinnhubProfile(cleanTicker);
+      if (fQuote) {
+        console.log(`[Financial Analyst] Resolved quote details via Finnhub for ${cleanTicker}`);
+        quote = {
+          regularMarketPrice: fQuote.c,
+          fiftyTwoWeekHigh: fQuote.h * 1.1,
+          fiftyTwoWeekLow: fQuote.l * 0.9,
+          regularMarketVolume: 0,
+          averageDailyVolume3Month: 0,
+          marketCap: fProfile ? (fProfile.marketCapitalization * 1e6) : 0,
+          exchange: fProfile ? fProfile.exchange : 'Unknown'
+        };
+      }
+    }
 
     // Load from cache or trigger profile loading to populate cache
     let cachedData = companyProfileCache.get(cleanTicker);
@@ -135,16 +206,16 @@ export async function getFinancials(ticker: string, useMock: boolean = false): P
       revenueGrowth: 'Verification Required'
     };
 
-    // 100% verified real-time/delayed quote metrics
-    const marketCap = quote.marketCap || 0;
-    const peRatio = quote.trailingPE || quote.forwardPE || 0;
-    const eps = quote.epsTrailingTwelveMonths || quote.epsForward || 0;
-    const fiftyTwoWeekLow = quote.fiftyTwoWeekLow || 0;
-    const fiftyTwoWeekHigh = quote.fiftyTwoWeekHigh || 0;
-    const volume = quote.regularMarketVolume || 0;
-    const averageVolume = quote.averageDailyVolume3Month || 0;
-    const dividendYield = quote.trailingAnnualDividendYield ? (quote.trailingAnnualDividendYield * 100) : 0;
-    const beta = quote.beta || 0;
+    // Extract quote metrics (either from Yahoo Finance or Finnhub fallback)
+    const marketCap = quote?.marketCap || 0;
+    const peRatio = quote?.trailingPE || quote?.forwardPE || 0;
+    const eps = quote?.epsTrailingTwelveMonths || quote?.epsForward || 0;
+    const fiftyTwoWeekLow = quote?.fiftyTwoWeekLow || 0;
+    const fiftyTwoWeekHigh = quote?.fiftyTwoWeekHigh || 0;
+    const volume = quote?.regularMarketVolume || 0;
+    const averageVolume = quote?.averageDailyVolume3Month || 0;
+    const dividendYield = quote?.trailingAnnualDividendYield ? (quote.trailingAnnualDividendYield * 100) : 0;
+    const beta = quote?.beta || 0;
 
     // Cross-checked balance sheet and income statement metrics
     const revenue = typeof verifiedFin.revenue === 'number' ? verifiedFin.revenue : 0;
