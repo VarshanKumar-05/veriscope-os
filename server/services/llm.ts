@@ -56,6 +56,22 @@ function cleanJson(text: string): string {
   if (cleaned.startsWith('```')) {
     cleaned = cleaned.replace(/^```(?:json)?/, '').replace(/```$/, '').trim();
   }
+  const startBrace = cleaned.indexOf('{');
+  const startBracket = cleaned.indexOf('[');
+  let startIdx = -1;
+  let endIdx = -1;
+
+  if (startBrace !== -1 && (startBracket === -1 || startBrace < startBracket)) {
+    startIdx = startBrace;
+    endIdx = cleaned.lastIndexOf('}');
+  } else if (startBracket !== -1) {
+    startIdx = startBracket;
+    endIdx = cleaned.lastIndexOf(']');
+  }
+
+  if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
+    cleaned = cleaned.substring(startIdx, endIdx + 1);
+  }
   return cleaned;
 }
 
