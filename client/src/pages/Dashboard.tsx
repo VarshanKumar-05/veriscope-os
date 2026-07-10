@@ -815,7 +815,7 @@ const eventSource = new EventSource(
               proOptions={{ hideAttribution: true }}
             >
               <Background gap={24} size={1.5} color={theme === 'dark' ? 'rgba(255, 255, 255, 0.15)' : '#e2e8f0'} />
-              <Controls position="bottom-right" className="bg-white dark:bg-slate-900 shadow-md border border-slate-200 dark:border-slate-800 fill-slate-700 dark:fill-slate-300" />
+              <Controls position="bottom-left" className="bg-white dark:bg-slate-900 shadow-md border border-slate-200 dark:border-slate-800 fill-slate-700 dark:fill-slate-300" />
               <MiniMap 
                 nodeColor={(node) => {
                   if (node.type === 'recommendationNode') return '#0f172a';

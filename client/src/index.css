@@ -388,3 +388,25 @@ button, .btn-premium {
     stroke-dashoffset: 0;
   }
 }
+
+/* Fix ReactFlow Controls Buttons overridden by Tailwind */
+.react-flow__controls-button {
+  background-color: var(--surface) !important;
+  border-bottom: 1px solid var(--border) !important;
+  fill: var(--text-primary) !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+  transition: all 0.2s ease !important;
+}
+
+.react-flow__controls-button:hover {
+  background-color: var(--hover) !important;
+}
+
+.react-flow__controls-button svg {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 14px !important;
+  max-height: 14px !important;
+}

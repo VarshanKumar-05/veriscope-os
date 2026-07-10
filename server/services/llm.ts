@@ -524,14 +524,19 @@ interface NewsSentimentAnalysis {
     negative: number; // percentage, e.g. 20
   };
 }
-Format exactly as raw JSON without markdown formatting. Do not include markdown code fence blocks.`;
+Format exactly as raw JSON without markdown formatting. Do not include markdown code fence blocks. Ensure ALL keys are wrapped in double quotes.`;
 
-  try {
-    const result = await callGeminiWithRetry(prompt, true);
-    const cleaned = cleanJson(result);
-    return JSON.parse(cleaned);
-  } catch (error: any) {
-    console.error("[News Sentiment] Failed:", error);
-    throw new Error(`News Sentiment Agent failed: ${error.message}`);
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const result = await callGeminiWithRetry(prompt, true);
+      const cleaned = cleanJson(result);
+      return JSON.parse(cleaned);
+    } catch (error: any) {
+      if (attempt === 3) {
+        console.error("[News Sentiment] Failed after 3 parsing attempts:", error);
+        throw new Error(`News Sentiment Agent failed: ${error.message}`);
+      }
+      console.warn(`[News Sentiment] JSON parse attempt ${attempt} failed, retrying...`);
+    }
   }
 }
