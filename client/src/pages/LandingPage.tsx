@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Search, Sparkles, Cpu, Award, ChevronRight, BarChart4, BookOpen, Layers, ShieldAlert, ArrowUpRight } from 'lucide-react';
-import { startResearch, fetchHistory } from '../services/api.js';
+import { startResearch, fetchHistory, fetchSearch, type SearchSuggestion } from '../services/api.js';
 
 const POPULAR_TICKERS = [
   { ticker: 'AAPL', name: 'Apple Inc.', industry: 'Consumer Electronics' },
@@ -13,18 +13,14 @@ const POPULAR_TICKERS = [
 ];
 
 const normalizeInput = (input: string): string => {
-  const clean = input.toLowerCase().trim();
-  if (clean === 'google' || clean === 'alphabet') return 'GOOGL';
-  if (clean === 'apple') return 'AAPL';
-  if (clean === 'microsoft') return 'MSFT';
-  if (clean === 'tesla') return 'TSLA';
-  if (clean === 'nvidia') return 'NVDA';
-  return input.toUpperCase().trim();
+  return input.trim();
 };
 
 export default function LandingPage() {
   const [tickerInput, setTickerInput] = useState('');
   const [errorText, setErrorText] = useState('');
+  const [suggestions, setSuggestions] = useState<SearchSuggestion[]>([]);
+  const [focused, setFocused] = useState(false);
   
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -55,6 +51,19 @@ export default function LandingPage() {
       researchMutation.mutate(normalized);
     }
   }, [searchParams]);
+
+  useEffect(() => {
+    if (tickerInput.trim().length < 2) {
+      setSuggestions([]);
+      return;
+    }
+    const delayDebounce = setTimeout(() => {
+      fetchSearch(tickerInput)
+        .then(setSuggestions)
+        .catch(err => console.error('[Landing Search] Failed to fetch suggestions:', err));
+    }, 300);
+    return () => clearTimeout(delayDebounce);
+  }, [tickerInput]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -104,6 +113,8 @@ export default function LandingPage() {
               type="text"
               value={tickerInput}
               onChange={(e) => setTickerInput(e.target.value)}
+              onFocus={() => setFocused(true)}
+              onBlur={() => setTimeout(() => setFocused(false), 200)}
               placeholder="Search ticker or name (e.g. Alphabet, GOOGL, Microsoft)..."
               disabled={researchMutation.isPending}
               className="w-full h-[72px] pl-14 pr-36 rounded-[18px] bg-surface border border-border-custom shadow-md focus:outline-hidden focus:border-slate-950 focus:ring-1 focus:ring-slate-950 dark:focus:border-white dark:focus:ring-white transition-all text-[20px] placeholder:text-[20px] text-text-primary"
@@ -126,6 +137,28 @@ export default function LandingPage() {
               )}
             </button>
           </form>
+
+          {focused && suggestions.length > 0 && (
+            <div className="absolute top-[80px] left-0 right-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg max-h-60 overflow-y-auto p-1.5 z-50 select-none text-left">
+              {suggestions.map((item, idx) => (
+                <div
+                  key={item.ticker + idx}
+                  onMouseDown={() => {
+                    setTickerInput(item.ticker);
+                    setSuggestions([]);
+                    researchMutation.mutate(item.ticker);
+                  }}
+                  className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer text-xs text-slate-800 dark:text-slate-200"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="font-bold tracking-wide font-mono text-blue-650 dark:text-blue-400">{item.ticker}</span>
+                    <span className="text-slate-500 dark:text-slate-400 truncate max-w-[280px]">{item.name}</span>
+                  </div>
+                  <span className="text-[10px] font-semibold text-slate-400 uppercase">{item.exchange}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Autocomplete Helper Tickers */}
           <div className="flex flex-wrap items-center justify-center gap-2 mt-5">

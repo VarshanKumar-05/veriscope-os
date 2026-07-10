@@ -18,13 +18,14 @@ import {
   Eye,
   Archive
 } from 'lucide-react';
-import { fetchHistory, togglePin, deleteReport, getExportUrl } from '../services/api.js';
+import { fetchHistory, togglePin, deleteReport, getExportUrl, fetchSearch, type SearchSuggestion } from '../services/api.js';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [darkTheme, setDarkTheme] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
+  const [searchSuggestions, setSearchSuggestions] = useState<SearchSuggestion[]>([]);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showProfileCard, setShowProfileCard] = useState(false);
   
@@ -107,21 +108,26 @@ export default function Layout() {
     }
   };
 
+  useEffect(() => {
+    if (searchQuery.trim().length < 2) {
+      setSearchSuggestions([]);
+      return;
+    }
+    const delayDebounce = setTimeout(() => {
+      fetchSearch(searchQuery)
+        .then(setSearchSuggestions)
+        .catch(err => console.error('[Header Search] Failed to fetch suggestions:', err));
+    }, 300);
+    return () => clearTimeout(delayDebounce);
+  }, [searchQuery]);
+
   const handleGlobalSearch = (e: React.FormEvent) => {
     e.preventDefault();
     if (!searchQuery.trim()) return;
     
-    // Check if searched ticker exists in history, navigate to it
-    const cleanQuery = searchQuery.toUpperCase().trim();
-    const existing = history.find(h => h.ticker === cleanQuery);
-    if (existing) {
-      navigate(`/research/${existing.id}`);
-      setSearchQuery('');
-    } else {
-      // Create new session via navigation query or redirect to landing page
-      navigate(`/?q=${cleanQuery}`);
-      setSearchQuery('');
-    }
+    const cleanQuery = searchQuery.trim();
+    navigate(`/?q=${encodeURIComponent(cleanQuery)}`);
+    setSearchQuery('');
   };
 
   const handleSidebarItemClick = (reportId: string) => {
@@ -453,29 +459,64 @@ export default function Layout() {
 
               {/* SEARCH AUTOCOMPLETE DRAWER */}
               {searchFocused && searchQuery.length > 0 && (
-                <div className="absolute top-11 left-0 right-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg max-h-60 overflow-y-auto p-1.5 z-50">
-                  <div className="px-2.5 py-1.5 text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-                    Quick Results
-                  </div>
-                  {filteredHistory.map(item => (
-                    <div
-                      key={item.id}
-                      onClick={() => navigate(`/research/${item.id}`)}
-                      className="flex items-center justify-between px-2.5 py-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer text-xs"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold tracking-wide font-mono">{item.ticker}</span>
-                        <span className="text-slate-400 truncate">{item.companyName}</span>
+                <div className="absolute top-11 left-0 right-0 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-lg max-h-60 overflow-y-auto p-1.5 z-50 select-none">
+                  {filteredHistory.length > 0 && (
+                    <>
+                      <div className="px-2.5 py-1.5 text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                        Recent Reports
                       </div>
-                      <span className="text-[10px] text-slate-400 capitalize">{item.recommendation}</span>
-                    </div>
-                  ))}
-                  {filteredHistory.length === 0 && (
+                      {filteredHistory.map(item => (
+                        <div
+                          key={item.id}
+                          onMouseDown={() => {
+                            navigate(`/research/${item.id}`);
+                            setSearchQuery('');
+                          }}
+                          className="flex items-center justify-between px-2.5 py-1.5 rounded-md hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer text-xs"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold tracking-wide font-mono text-slate-900 dark:text-white">{item.ticker}</span>
+                            <span className="text-slate-400 truncate max-w-[180px]">{item.companyName}</span>
+                          </div>
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 capitalize">{item.recommendation}</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+                  
+                  {searchSuggestions.length > 0 && (
+                    <>
+                      <div className="px-2.5 py-1.5 text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider border-t border-slate-100 dark:border-slate-800/60 mt-1 pt-1.5">
+                        Global Directory Suggestions
+                      </div>
+                      {searchSuggestions.map((item, index) => (
+                        <div
+                          key={item.ticker + index}
+                          onMouseDown={() => {
+                            setSearchQuery('');
+                            navigate(`/?q=${encodeURIComponent(item.ticker)}`);
+                          }}
+                          className="flex items-center justify-between px-2.5 py-1.5 rounded-md hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer text-xs"
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold tracking-wide font-mono text-blue-650 dark:text-blue-400">{item.ticker}</span>
+                            <span className="text-slate-500 dark:text-slate-400 truncate max-w-[200px]">{item.name}</span>
+                          </div>
+                          <span className="text-[9px] font-semibold text-slate-400 uppercase">{item.exchange}</span>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
+                  {filteredHistory.length === 0 && searchSuggestions.length === 0 && (
                     <div
-                      onClick={() => navigate(`/?q=${searchQuery.toUpperCase()}`)}
+                      onMouseDown={() => {
+                        navigate(`/?q=${encodeURIComponent(searchQuery)}`);
+                        setSearchQuery('');
+                      }}
                       className="px-2.5 py-2 rounded-md hover:bg-slate-50 dark:hover:bg-slate-850 cursor-pointer text-xs text-blue-600 dark:text-blue-400 font-medium"
                     >
-                      Start new research for "{searchQuery.toUpperCase()}"
+                      Search global directory for "{searchQuery}"
                     </div>
                   )}
                 </div>

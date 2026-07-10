@@ -61,3 +61,16 @@ export async function startResearch(ticker: string): Promise<{ id: string; ticke
 export function getExportUrl(id: string): string {
   return `${API_BASE}/history/${id}/export`;
 }
+
+export interface SearchSuggestion {
+  ticker: string;
+  name: string;
+  exchange: string;
+  industry?: string;
+}
+
+export async function fetchSearch(query: string): Promise<SearchSuggestion[]> {
+  const res = await fetch(`${API_BASE}/search?q=${encodeURIComponent(query)}`);
+  if (!res.ok) throw new Error('Failed to fetch autocomplete suggestions');
+  return res.json();
+}

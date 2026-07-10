@@ -88,7 +88,7 @@ async function callGemini(prompt: string, expectJson: boolean = false): Promise<
 }
 
 // Retry caller wrapper with exponential backoff
-async function callGeminiWithRetry(prompt: string, expectJson: boolean = false): Promise<string> {
+export async function callGeminiWithRetry(prompt: string, expectJson: boolean = false): Promise<string> {
   const maxRetries = 3;
   let delay = 1000;
 
@@ -403,5 +403,114 @@ Format exactly as raw JSON without markdown formatting.`;
   } catch (error: any) {
     console.error("[Decision Maker] Failed:", error);
     throw new Error(`Decision Agent failed: ${error.message}`);
+  }
+}
+
+export async function runDataVerificationAgent(ticker: string, companyName: string): Promise<any> {
+  const prompt = `You are a Lead Financial Data Verification Agent for Veriscope. Your task is to collect and verify corporate metadata and financial metrics (TTM/LTM) for "${companyName}" (${ticker}).
+You must cross-check important fields across multiple reliable sources (e.g. SEC filings, Yahoo Finance, Finnhub, official investor relations).
+If sources disagree or you are uncertain, you MUST write "Verification Required" for that field instead of fabricating it. Never invent data.
+
+Collect the following corporate identity fields:
+- CEO
+- Founders (array of strings)
+- Founded Year (string)
+- Workforce (number of employees, or "Verification Required")
+- Sector (string)
+- Industry (string)
+- Headquarters Address (string)
+- Website (string)
+- Business Model (1-2 sentence description)
+- Summary (3-4 sentence business overview)
+
+Collect the following financial metrics (for the trailing twelve months TTM, in USD or native currency):
+- Total Revenue (in USD or native currency)
+- Net Income (in USD or native currency)
+- EBITDA (in USD or native currency)
+- Operating Margin (percentage, e.g. "15.4%")
+- Free Cash Flow (in USD or native currency)
+- Total Debt (in USD or native currency)
+- Return on Equity (ROE, e.g. "12.5%")
+- Return on Assets (ROA, e.g. "6.2%")
+- Current Ratio (e.g. "1.45")
+- Quick Ratio (e.g. "1.10")
+- Revenue Growth (YoY, percentage, e.g. "5.2%")
+
+Return your response ONLY as a JSON object matching this TypeScript interface:
+interface VerifiedData {
+  company: {
+    ceo: string;
+    founders: string[];
+    founded: string;
+    employeeCount: number | "Verification Required";
+    sector: string;
+    industry: string;
+    headquarters: string;
+    website: string;
+    businessModel: string;
+    summary: string;
+  };
+  financials: {
+    revenue: number | "Verification Required";
+    netIncome: number | "Verification Required";
+    ebitda: number | "Verification Required";
+    operatingMargin: string | "Verification Required";
+    freeCashFlow: number | "Verification Required";
+    debt: number | "Verification Required";
+    roe: string | "Verification Required";
+    roa: string | "Verification Required";
+    currentRatio: string | "Verification Required";
+    quickRatio: string | "Verification Required";
+    revenueGrowth: string | "Verification Required";
+  };
+  metadata: {
+    verifiedSources: string[]; // e.g. ["SEC Form 10-K", "Yahoo Finance"]
+    confidenceScore: number;   // 0-100 based on source alignment and verification certainty
+    verificationStatus: string; // e.g. "Verified" or "Verification Required"
+    dataFreshness: string;      // e.g. "Q1 2026", "TTM"
+  };
+}
+Format exactly as raw JSON without markdown formatting. Do not include markdown code fence blocks.`;
+
+  try {
+    const result = await callGeminiWithRetry(prompt, true);
+    const cleaned = cleanJson(result);
+    return JSON.parse(cleaned);
+  } catch (error: any) {
+    console.error("[Data Verification] Failed:", error);
+    throw new Error(`Data Verification Agent failed: ${error.message}`);
+  }
+}
+
+export async function runNewsSentimentAgent(articles: { title: string, url: string, date: string }[]): Promise<any> {
+  const prompt = `You are an expert News Sentiment Analyst. You are given the following list of real news article titles:
+${articles.map((a, i) => `[${i+1}] Title: "${a.title}"`).join('\n')}
+
+Analyze these articles and classify the sentiment of each title as "positive", "neutral", or "negative".
+Also, output a general sentiment score breakdown (percentage of positive, neutral, negative articles).
+Do not invent any new articles or details.
+
+Return your response ONLY as a JSON object matching this TypeScript interface:
+interface NewsSentimentAnalysis {
+  articles: {
+    sentiment: "positive" | "neutral" | "negative";
+    category: "earnings" | "AI announcements" | "regulatory" | "general";
+    summary: string; // A concise 1-sentence summary based strictly on the title
+  }[];
+  sentimentSummary: {
+    positive: number; // percentage, e.g. 60
+    neutral: number;  // percentage, e.g. 20
+    negative: number; // percentage, e.g. 20
+  };
+}
+Format exactly as raw JSON without markdown formatting. Do not include markdown code fence blocks.`;
+
+  try {
+    const result = await callGeminiWithRetry(prompt, true);
+    const cleaned = cleanJson(result);
+    return JSON.parse(cleaned);
+  } catch (error: any) {
+    console.error("[News Sentiment] Failed:", error);
+    throw new Error(`News Sentiment Agent failed: ${error.message}`);
   }
 }

@@ -6,6 +6,7 @@ import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { ResearchGraph } from '../graph/graph.js';
 import { ResearchState } from '../../shared/types.js';
+import { discoverCompanies, resolveBestMatch } from '../services/discovery.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -16,9 +17,8 @@ const router = Router();
 // Zod schema for input validation
 const TickerSchema = z.object({
   ticker: z.string()
-    .min(1, 'Ticker is required')
-    .max(10, 'Ticker must be 10 characters or less')
-    .regex(/^[a-zA-Z0-9.\-]+$/, 'Ticker can only contain letters, numbers, dots, and dashes')
+    .min(1, 'Search query is required')
+    .max(50, 'Search query is too long')
 });
 
 // Map of active streaming sessions
@@ -151,34 +151,60 @@ router.delete('/history/:id', (req: Request, res: Response) => {
   res.json({ success: true });
 });
 
+// GET /api/search
+router.get('/search', async (req: Request, res: Response) => {
+  const query = req.query.q;
+  if (!query || typeof query !== 'string') {
+    res.status(400).json({ error: 'Query parameter q is required' });
+    return;
+  }
+  try {
+    const suggestions = await discoverCompanies(query);
+    res.json(suggestions);
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /api/research
-router.post('/research', (req: Request, res: Response) => {
+router.post('/research', async (req: Request, res: Response) => {
   const validation = TickerSchema.safeParse(req.body);
   if (!validation.success) {
     res.status(400).json({ error: validation.error.errors[0].message });
     return;
   }
 
-  const ticker = validation.data.ticker.toUpperCase();
-  const id = crypto.randomUUID();
+  const query = validation.data.ticker;
+  try {
+    const bestMatch = await resolveBestMatch(query);
+    if (!bestMatch) {
+      res.status(404).json({ error: 'Company not found.' });
+      return;
+    }
 
-  // Create initial state
-  const initialState: ResearchState = {
-    ticker,
-    status: 'idle',
-    progress: 0,
-    plan: [],
-    logs: []
-  };
+    const ticker = bestMatch.ticker;
+    const id = crypto.randomUUID();
 
-  activeSessions.set(id, {
-    ticker,
-    state: initialState,
-    pinned: false,
-    createdAt: new Date().toISOString()
-  });
+    // Create initial state
+    const initialState: ResearchState = {
+      ticker,
+      status: 'idle',
+      progress: 0,
+      plan: [],
+      logs: []
+    };
 
-  res.status(202).json({ id, ticker });
+    activeSessions.set(id, {
+      ticker,
+      state: initialState,
+      pinned: false,
+      createdAt: new Date().toISOString()
+    });
+
+    res.status(202).json({ id, ticker });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // GET /api/research/stream
