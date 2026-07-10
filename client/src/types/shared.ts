@@ -15,11 +15,20 @@ export interface CompanyIntel {
   founded: string;
   ceo: string;
   industry: string;
-  employeeCount: number;
+  employeeCount: number | "Verified information unavailable";
   products: string[];
   businessModel: string;
   website: string;
   summary: string;
+  exchange?: string;
+  country?: string;
+  currency?: string;
+  sector?: string;
+  verifiedSources?: string[];
+  lastUpdated?: string;
+  confidenceScore?: number;
+  verificationStatus?: string;
+  dataFreshness?: string;
 }
 
 export interface FinancialMetric {

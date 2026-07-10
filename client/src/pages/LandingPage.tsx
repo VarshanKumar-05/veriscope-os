@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Sparkles, Cpu, Award, ChevronRight, BarChart4, BookOpen, Layers, ShieldAlert, ArrowUpRight } from 'lucide-react';
-import { startResearch, fetchHistory, fetchSearch, type SearchSuggestion } from '../services/api.js';
+import { Search, Sparkles, Cpu, Award, ChevronRight, BarChart4, BookOpen, Layers, ShieldAlert, Trash2, Bookmark } from 'lucide-react';
+import { startResearch, fetchHistory, fetchSearch, togglePin, deleteReport, type SearchSuggestion } from '../services/api.js';
 
 const POPULAR_TICKERS = [
   { ticker: 'AAPL', name: 'Apple Inc.', industry: 'Consumer Electronics' },
@@ -25,6 +25,20 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
+
+  const pinMutation = useMutation({
+    mutationFn: togglePin,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['history'] });
+    }
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: deleteReport,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['history'] });
+    }
+  });
 
   // Load history list to display recent research
   const { data: history = [] } = useQuery({
@@ -186,35 +200,110 @@ export default function LandingPage() {
 
       {/* RECENT RESEARCH ARCHIVE LIST */}
       {history.length > 0 && (
-        <div id="recent-research-section" className="w-full max-w-4xl space-y-6">
+        <div id="recent-research-section" className="w-full max-w-4xl space-y-6 page-transition">
           <div className="flex items-end justify-between border-b border-border-custom pb-3 mb-6">
-            <h2 className="text-[32px] font-bold text-text-primary tracking-tight leading-none">Recent Research Archives</h2>
+            <h2 className="text-[32px] font-bold text-text-primary tracking-tight leading-none">Research Archive</h2>
             <span className="text-xs text-text-secondary font-mono mb-1">{history.length} Session Reports</span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-            {history.slice(0, 4).map(item => (
-              <div 
-                key={item.id}
-                onClick={() => navigate(`/research/${item.id}`)}
-                className="p-6 rounded-[20px] bg-surface border border-border-custom hover:shadow-md cursor-pointer transition-all flex justify-between items-center group"
-              >
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2.5">
-                    <span className="font-mono text-sm font-black text-text-secondary">{item.ticker}</span>
-                    <span className="text-sm font-bold text-text-primary truncate max-w-[180px]">{item.companyName}</span>
-                  </div>
-                  <div className="text-[10px] text-text-secondary uppercase tracking-wider font-mono">
-                    Rating: <span className="font-bold text-text-primary">{item.recommendation}</span>
-                  </div>
-                </div>
+          <div className="overflow-x-auto rounded-xl border border-border-custom bg-surface shadow-xs">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-border-custom bg-slate-50/50 dark:bg-slate-900/50 text-[10px] font-bold text-text-secondary uppercase tracking-wider font-mono">
+                  <th className="px-6 py-4">Ticker / Company</th>
+                  <th className="px-6 py-4">Date & Time</th>
+                  <th className="px-6 py-4">Rating</th>
+                  <th className="px-6 py-4">Status</th>
+                  <th className="px-6 py-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border-custom text-xs">
+                {history.map(item => {
+                  const isCompleted = item.status === 'completed';
+                  const dateVal = item.createdAt || new Date().toISOString();
+                  const formattedDate = (() => {
+                    try {
+                      const d = new Date(dateVal);
+                      const dStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+                      const tStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+                      return `${dStr} at ${tStr}`;
+                    } catch (e) {
+                      return dateVal;
+                    }
+                  })();
 
-                <div className="flex items-center gap-1.5 text-text-secondary group-hover:text-text-primary transition-colors">
-                  <span className="text-[10px] font-mono">Open Report</span>
-                  <ArrowUpRight size={14} />
-                </div>
-              </div>
-            ))}
+                  return (
+                    <tr 
+                      key={item.id}
+                      className="hover:bg-slate-50/55 dark:hover:bg-slate-900/25 transition-colors cursor-pointer group"
+                      onClick={() => isCompleted && navigate(`/research/${item.id}`)}
+                    >
+                      <td className="px-6 py-4 font-semibold text-text-primary">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 px-1.5 py-0.5 rounded-md font-bold">{item.ticker}</span>
+                          <span className="truncate max-w-[180px]">{item.companyName}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-text-secondary font-mono">
+                        {formattedDate}
+                      </td>
+                      <td className="px-6 py-4 font-serif">
+                        {item.recommendation ? (
+                          <span className={`px-2 py-0.5 rounded-sm text-[10px] font-bold uppercase tracking-wider ${
+                            item.recommendation.includes('Buy') ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-600 dark:text-emerald-400' :
+                            item.recommendation.includes('Sell') ? 'bg-red-50 dark:bg-red-950/30 text-red-500 dark:text-red-400' :
+                            'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                          }`}>
+                            {item.recommendation}
+                          </span>
+                        ) : (
+                          <span className="text-text-secondary">—</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`w-2 h-2 rounded-full ${
+                            item.status === 'completed' ? 'bg-emerald-500' :
+                            item.status === 'failed' ? 'bg-red-500' :
+                            'bg-blue-500 animate-ping'
+                          }`} />
+                          <span className="capitalize font-mono text-[10px]">{item.status}</span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-right" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-2">
+                          <button
+                            onClick={() => handleTickerSelect(item.ticker)}
+                            className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-text-secondary hover:text-text-primary transition-all cursor-pointer"
+                            title="Re-run research"
+                          >
+                            <Search size={14} />
+                          </button>
+                          <button
+                            onClick={() => pinMutation.mutate(item.id)}
+                            className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-text-secondary hover:text-text-primary transition-all cursor-pointer"
+                            title={item.pinned ? "Unpin report" : "Pin report"}
+                          >
+                            <Bookmark size={14} className={item.pinned ? "fill-slate-400 dark:fill-slate-500" : ""} />
+                          </button>
+                          <button
+                            onClick={() => {
+                              if (confirm('Delete this report permanently?')) {
+                                deleteMutation.mutate(item.id);
+                              }
+                            }}
+                            className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-text-secondary hover:text-[var(--danger)] transition-all cursor-pointer"
+                            title="Delete report"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

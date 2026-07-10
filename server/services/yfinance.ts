@@ -88,41 +88,53 @@ export async function getCompanyProfile(ticker: string, useMock: boolean = false
     const yf = new (yahooFinance as any)();
     let name = cleanTicker;
     let exchange = 'Unknown';
+    let quote: any = null;
     try {
       console.log(`[Company Intel] Requesting Yahoo Finance quote for ${cleanTicker}`);
-      const quote = await withTimeout(yf.quote(cleanTicker), 15000, `Yahoo Finance quote for ${cleanTicker}`) as any;
+      quote = await withTimeout(yf.quote(cleanTicker), 15000, `Yahoo Finance quote for ${cleanTicker}`) as any;
       if (quote) {
         name = quote.longName || quote.shortName || cleanTicker;
         exchange = quote.exchange || 'Unknown';
       }
     } catch (err: any) {
       console.warn(`[Company Intel] Yahoo Finance quote failed for ${cleanTicker}:`, err.message);
-      
-      // Fallback to Finnhub
-      const finnhubProfile = await fetchFinnhubProfile(cleanTicker);
-      if (finnhubProfile) {
-        console.log(`[Company Intel] Resolved company details via Finnhub for ${cleanTicker}`);
+    }
+    
+    // Always fetch Finnhub profile to gather more verified sources and fallback
+    const finnhubProfile = await fetchFinnhubProfile(cleanTicker);
+    if (finnhubProfile) {
+      console.log(`[Company Intel] Retrieved company details via Finnhub for ${cleanTicker}`);
+      if (!quote) {
         name = finnhubProfile.name || name;
         exchange = finnhubProfile.exchange || exchange;
       }
     }
 
+    const contextData = {
+      yahooFinanceQuote: quote,
+      finnhubProfile: finnhubProfile
+    };
+
     console.log(`[Company Intel] Querying Gemini Data Verification Agent for ${cleanTicker}`);
-    const verified = await runDataVerificationAgent(cleanTicker, name);
+    const verified = await runDataVerificationAgent(cleanTicker, name, contextData);
 
     const profile = {
       name,
       ticker: cleanTicker,
-      headquarters: verified.company.headquarters || 'Verification Required',
-      founders: verified.company.founders || ['Verification Required'],
-      founded: verified.company.founded || 'Verification Required',
-      ceo: verified.company.ceo || 'Verification Required',
-      industry: verified.company.industry || 'Verification Required',
+      exchange: exchange,
+      country: finnhubProfile?.country || quote?.country || 'Unknown',
+      currency: finnhubProfile?.currency || quote?.currency || quote?.financialCurrency || 'USD',
+      sector: verified.company.sector || 'Verified information unavailable',
+      headquarters: verified.company.headquarters || 'Verified information unavailable',
+      founders: verified.company.founders || ['Verified information unavailable'],
+      founded: verified.company.founded || 'Verified information unavailable',
+      ceo: verified.company.ceo || 'Verified information unavailable',
+      industry: verified.company.industry || 'Verified information unavailable',
       employeeCount: typeof verified.company.employeeCount === 'number' ? verified.company.employeeCount : 0,
       products: [],
-      businessModel: verified.company.businessModel || 'Verification Required',
+      businessModel: verified.company.businessModel || 'Verified information unavailable',
       website: verified.company.website || '',
-      summary: verified.company.summary || 'Verification Required',
+      summary: verified.company.summary || 'Verified information unavailable',
       // Data credentials quality fields
       verifiedSources: verified.metadata.verifiedSources || ['Yahoo Finance', 'Finnhub', 'SEC Filings'],
       lastUpdated: new Date().toLocaleString(),
@@ -193,17 +205,17 @@ export async function getFinancials(ticker: string, useMock: boolean = false): P
     }
 
     const verifiedFin = cachedData?.financialsData || {
-      revenue: 'Verification Required',
-      netIncome: 'Verification Required',
-      ebitda: 'Verification Required',
-      operatingMargin: 'Verification Required',
-      freeCashFlow: 'Verification Required',
-      debt: 'Verification Required',
-      roe: 'Verification Required',
-      roa: 'Verification Required',
-      currentRatio: 'Verification Required',
-      quickRatio: 'Verification Required',
-      revenueGrowth: 'Verification Required'
+      revenue: 'Verified information unavailable',
+      netIncome: 'Verified information unavailable',
+      ebitda: 'Verified information unavailable',
+      operatingMargin: 'Verified information unavailable',
+      freeCashFlow: 'Verified information unavailable',
+      debt: 'Verified information unavailable',
+      roe: 'Verified information unavailable',
+      roa: 'Verified information unavailable',
+      currentRatio: 'Verified information unavailable',
+      quickRatio: 'Verified information unavailable',
+      revenueGrowth: 'Verified information unavailable'
     };
 
     // Extract quote metrics (either from Yahoo Finance or Finnhub fallback)
@@ -228,7 +240,7 @@ export async function getFinancials(ticker: string, useMock: boolean = false): P
     const revenueGrowthVal = parseFloat(verifiedFin.revenueGrowth) || 0;
 
     const formatNumber = (num: number): string => {
-      if (!num) return 'Verification Required';
+      if (!num) return 'Verified information unavailable';
       if (num >= 1e12) return `$${(num / 1e12).toFixed(2)}T`;
       if (num >= 1e9) return `$${(num / 1e9).toFixed(2)}B`;
       if (num >= 1e6) return `$${(num / 1e6).toFixed(2)}M`;

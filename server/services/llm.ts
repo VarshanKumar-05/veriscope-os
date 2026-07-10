@@ -422,16 +422,19 @@ Format exactly as raw JSON without markdown formatting.`;
   }
 }
 
-export async function runDataVerificationAgent(ticker: string, companyName: string): Promise<any> {
+export async function runDataVerificationAgent(ticker: string, companyName: string, contextData: any = null): Promise<any> {
   const prompt = `You are a Lead Financial Data Verification Agent for Veriscope. Your task is to collect and verify corporate metadata and financial metrics (TTM/LTM) for "${companyName}" (${ticker}).
 You must cross-check important fields across multiple reliable sources (e.g. SEC filings, Yahoo Finance, Finnhub, official investor relations).
-If sources disagree or you are uncertain, you MUST write "Verification Required" for that field instead of fabricating it. Never invent data.
+If sources disagree, you are uncertain, or data is missing, you MUST write "Verified information unavailable" for that field instead of fabricating it. Never invent data.
+
+Here is raw context data retrieved from verified API sources (Yahoo Finance, Finnhub, etc.):
+${JSON.stringify(contextData, null, 2)}
 
 Collect the following corporate identity fields:
 - CEO
 - Founders (array of strings)
 - Founded Year (string)
-- Workforce (number of employees, or "Verification Required")
+- Workforce (number of employees, or "Verified information unavailable")
 - Sector (string)
 - Industry (string)
 - Headquarters Address (string)
@@ -458,7 +461,7 @@ interface VerifiedData {
     ceo: string;
     founders: string[];
     founded: string;
-    employeeCount: number | "Verification Required";
+    employeeCount: number | "Verified information unavailable";
     sector: string;
     industry: string;
     headquarters: string;
@@ -467,22 +470,22 @@ interface VerifiedData {
     summary: string;
   };
   financials: {
-    revenue: number | "Verification Required";
-    netIncome: number | "Verification Required";
-    ebitda: number | "Verification Required";
-    operatingMargin: string | "Verification Required";
-    freeCashFlow: number | "Verification Required";
-    debt: number | "Verification Required";
-    roe: string | "Verification Required";
-    roa: string | "Verification Required";
-    currentRatio: string | "Verification Required";
-    quickRatio: string | "Verification Required";
-    revenueGrowth: string | "Verification Required";
+    revenue: number | "Verified information unavailable";
+    netIncome: number | "Verified information unavailable";
+    ebitda: number | "Verified information unavailable";
+    operatingMargin: string | "Verified information unavailable";
+    freeCashFlow: number | "Verified information unavailable";
+    debt: number | "Verified information unavailable";
+    roe: string | "Verified information unavailable";
+    roa: string | "Verified information unavailable";
+    currentRatio: string | "Verified information unavailable";
+    quickRatio: string | "Verified information unavailable";
+    revenueGrowth: string | "Verified information unavailable";
   };
   metadata: {
     verifiedSources: string[]; // e.g. ["SEC Form 10-K", "Yahoo Finance"]
     confidenceScore: number;   // 0-100 based on source alignment and verification certainty
-    verificationStatus: string; // e.g. "Verified" or "Verification Required"
+    verificationStatus: string; // e.g. "Verified" or "Verified information unavailable"
     dataFreshness: string;      // e.g. "Q1 2026", "TTM"
   };
 }

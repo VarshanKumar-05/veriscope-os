@@ -34,6 +34,33 @@ export default function Layout() {
   const location = useLocation();
   const queryClient = useQueryClient();
 
+  const [watchlist, setWatchlist] = useState<any[]>(() => {
+    const saved = localStorage.getItem('watchlist');
+    if (saved) {
+      try { return JSON.parse(saved); } catch (e) {}
+    }
+    return [
+      { ticker: 'AAPL', name: 'Apple Inc.', price: '$189.30', change: '+1.2%' },
+      { ticker: 'NVDA', name: 'NVIDIA Corp.', price: '$875.12', change: '+4.8%' },
+      { ticker: 'MSFT', name: 'Microsoft Corp.', price: '$420.55', change: '-0.3%' }
+    ];
+  });
+
+  useEffect(() => {
+    const handleWatchlistUpdate = () => {
+      const saved = localStorage.getItem('watchlist');
+      if (saved) {
+        try { setWatchlist(JSON.parse(saved)); } catch (e) {}
+      }
+    };
+    window.addEventListener('watchlist-update', handleWatchlistUpdate);
+    window.addEventListener('storage', handleWatchlistUpdate);
+    return () => {
+      window.removeEventListener('watchlist-update', handleWatchlistUpdate);
+      window.removeEventListener('storage', handleWatchlistUpdate);
+    };
+  }, []);
+
   // Load history list via React Query
   const { data: history = [] } = useQuery({
     queryKey: ['history'],
@@ -59,18 +86,26 @@ export default function Layout() {
     }
   });
 
-  // Hotkey listener: Cmd+K / Ctrl+K to focus search
+  // Accessibility Hotkey listeners: Ctrl+K / Alt+S to search, Alt+T to toggle theme, Alt+H for home
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+      if (((e.metaKey || e.ctrlKey) && e.key === 'k') || (e.altKey && e.key.toLowerCase() === 's')) {
         e.preventDefault();
-        const searchInput = document.getElementById('global-search');
-        if (searchInput) searchInput.focus();
+        const searchInput = document.getElementById('global-search') || document.querySelector('input[type="text"]');
+        if (searchInput) (searchInput as HTMLInputElement).focus();
+      }
+      if (e.altKey && e.key.toLowerCase() === 't') {
+        e.preventDefault();
+        toggleTheme();
+      }
+      if (e.altKey && e.key.toLowerCase() === 'h') {
+        e.preventDefault();
+        navigate('/');
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
+  }, [darkTheme, navigate]);
 
   // Sync theme (detecting system theme defaults if storage is empty)
   useEffect(() => {
@@ -205,47 +240,40 @@ export default function Layout() {
               <Eye size={12} />
               <span>WATCHLIST</span>
             </div>
-            <div className="space-y-2 mt-2">
-              <div 
-                onClick={() => navigate('/?q=AAPL')}
-                className="flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold text-text-primary hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-all border border-transparent hover:border-border-custom"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="font-bold font-mono text-sm">AAPL</span>
-                  <span className="text-xs text-text-secondary font-medium">Apple</span>
-                </div>
-                <div className="text-right">
-                  <div className="font-mono text-sm font-bold text-text-primary">$189.30</div>
-                  <div className="text-xs font-bold text-emerald-600 font-mono">+1.2%</div>
-                </div>
+            {watchlist.length === 0 ? (
+              <div className="px-4 py-2.5 text-xs italic text-text-secondary">
+                No pinned watchlist items.
               </div>
-              <div 
-                onClick={() => navigate('/?q=NVDA')}
-                className="flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold text-text-primary hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-all border border-transparent hover:border-border-custom"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="font-bold font-mono text-sm">NVDA</span>
-                  <span className="text-xs text-text-secondary font-medium">NVIDIA</span>
-                </div>
-                <div className="text-right">
-                  <div className="font-mono text-sm font-bold text-text-primary">$875.12</div>
-                  <div className="text-xs font-bold text-emerald-600 font-mono">+4.8%</div>
-                </div>
+            ) : (
+              <div className="space-y-2 mt-2">
+                {watchlist.map((item, idx) => {
+                  const isChangePositive = !item.change || item.change.startsWith('+');
+                  return (
+                    <div 
+                      key={item.ticker + idx}
+                      onClick={() => navigate(`/?q=${item.ticker}`)}
+                      className="flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold text-text-primary hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-all border border-transparent hover:border-border-custom card-premium"
+                    >
+                      <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold font-mono text-sm tracking-tight">{item.ticker}</span>
+                          {item.exchange && (
+                            <span className="text-[8px] font-bold text-text-secondary font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded-sm shrink-0">{item.exchange}</span>
+                          )}
+                        </div>
+                        <span className="text-[10px] text-text-secondary truncate max-w-[120px] font-medium mt-0.5">{item.name}</span>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <div className="font-mono text-xs font-bold text-text-primary">{item.price || '$--.--'}</div>
+                        <div className={`text-[10px] font-bold font-mono ${isChangePositive ? 'text-emerald-600' : 'text-red-500'}`}>
+                          {item.change || '0.00%'}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-              <div 
-                onClick={() => navigate('/?q=MSFT')}
-                className="flex items-center justify-between px-4 py-2.5 rounded-xl text-sm font-semibold text-text-primary hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-all border border-transparent hover:border-border-custom"
-              >
-                <div className="flex items-center gap-2">
-                  <span className="font-bold font-mono text-sm">MSFT</span>
-                  <span className="text-xs text-text-secondary font-medium">Microsoft</span>
-                </div>
-                <div className="text-right">
-                  <div className="font-mono text-sm font-bold text-text-primary">$420.55</div>
-                  <div className="text-xs font-bold text-red-500 font-mono">-0.3%</div>
-                </div>
-              </div>
-            </div>
+            )}
           </div>
 
           {/* TRENDING COMPANIES *          {/* TRENDING COMPANIES */}

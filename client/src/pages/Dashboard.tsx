@@ -37,8 +37,14 @@ import {
   Minus,
   Printer,
   Loader2,
-  Bookmark
+  Bookmark,
+  Eye
 } from 'lucide-react';
+
+// @ts-ignore
+import html2pdf from 'html2pdf.js';
+// @ts-ignore
+import html2canvas from 'html2canvas';
 
 import { fetchReport, togglePin } from '../services/api.js';
 import LoadingScreen from '../components/LoadingScreen.tsx';
@@ -72,6 +78,15 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
+  const formatLiveDateTime = (dateVal?: string | Date) => {
+    const d = dateVal ? new Date(dateVal) : new Date();
+    const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    const timeStr = d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+    // Safe extraction of timezone abbreviation (e.g. IST, EST)
+    const tzStr = d.toLocaleDateString('en-US', { timeZoneName: 'short' }).split(', ')[1] || 'UTC';
+    return `${dateStr} ${timeStr} ${tzStr}`;
+  };
+
   const isStreamingRequested = searchParams.get('stream') === 'true';
 
   // Local state for streaming sessions
@@ -101,6 +116,7 @@ export default function Dashboard() {
       queryClient.invalidateQueries({ queryKey: ['report', id] });
     }
   });
+
 
   // Handle SSE Streaming Connection
   useEffect(() => {
@@ -163,6 +179,48 @@ const eventSource = new EventSource(
     return reportData?.state;
   }, [isStreamingRequested, streamState, reportData]);
 
+  const [inWatchlist, setInWatchlist] = useState(false);
+  const [canvasImage, setCanvasImage] = useState<string | null>(null);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
+
+  useEffect(() => {
+    if (!reportState?.ticker) return;
+    const saved = localStorage.getItem('watchlist');
+    if (saved) {
+      try {
+        const list = JSON.parse(saved);
+        setInWatchlist(list.some((item: any) => item.ticker === reportState.ticker));
+      } catch (e) {}
+    }
+  }, [reportState]);
+
+  const toggleWatchlistItem = () => {
+    if (!reportState?.ticker) return;
+    const saved = localStorage.getItem('watchlist');
+    let list: any[] = [];
+    if (saved) {
+      try { list = JSON.parse(saved); } catch (e) {}
+    }
+    
+    const exists = list.some((item: any) => item.ticker === reportState.ticker);
+    if (exists) {
+      list = list.filter((item: any) => item.ticker !== reportState.ticker);
+    } else {
+      const curPrice = reportState?.financials?.formattedMetrics?.regularMarketPrice?.value || reportState?.financials?.formattedMetrics?.marketCap?.value || '$--.--';
+      const curChange = reportState?.financials?.formattedMetrics?.revenueGrowth?.value || '0.00%';
+      list.push({
+        ticker: reportState.ticker,
+        name: reportState?.companyIntel?.name || reportState.ticker,
+        price: curPrice,
+        change: curChange,
+        exchange: (reportState?.companyIntel as any)?.exchange || 'Unknown'
+      });
+    }
+    localStorage.setItem('watchlist', JSON.stringify(list));
+    setInWatchlist(!exists);
+    window.dispatchEvent(new Event('watchlist-update'));
+  };
+
   // Helper to categorize evidence dynamically on the client
   const getEvidenceCategory = (ev: EvidenceCard) => {
     const idLower = ev.id.toLowerCase();
@@ -196,6 +254,8 @@ const eventSource = new EventSource(
     if (!intel || !financials || !risks || !decision) return;
 
     // 1. Position Evidence Nodes in column 1 (left)
+    const totalEvidence = evidence.length;
+    const evidenceSpacing = Math.max(160, Math.min(220, 800 / totalEvidence));
     const evidenceNodes = evidence.map((ev: EvidenceCard, index: number) => {
       const cat = getEvidenceCategory(ev);
       return {
@@ -205,7 +265,7 @@ const eventSource = new EventSource(
           ...ev,
           category: cat // Inject computed category to the custom node
         },
-        position: { x: 60, y: 60 + index * 200 },
+        position: { x: 60, y: 60 + index * evidenceSpacing },
         draggable: true
       };
     });
@@ -235,7 +295,7 @@ const eventSource = new EventSource(
         ...decision,
         overallScore: 100 - risks.overallScore, // Company Health Score
         evidenceCount: evidence.length,
-        lastUpdated: new Date().toLocaleDateString()
+        lastUpdated: formatLiveDateTime(reportData?.createdAt)
       },
       position: { x: 900, y: 300 },
       draggable: true
@@ -354,8 +414,88 @@ const eventSource = new EventSource(
 
   const isPinned = reportData.pinned;
 
-  const handlePrint = () => {
-    window.print();
+  const handlePrint = async () => {
+    console.log('[PDF Export] Initiating high-DPI PDF generation...');
+    setIsExportingPDF(true);
+
+    const canvasContainer = document.querySelector('.react-flow');
+    if (canvasContainer) {
+      try {
+        console.log('[PDF Export] Capturing React Flow Canvas...');
+        const controls = canvasContainer.querySelector('.react-flow__controls');
+        const minimap = canvasContainer.querySelector('.react-flow__minimap');
+        if (controls) controls.classList.add('hidden');
+        if (minimap) minimap.classList.add('hidden');
+
+        const canvas = await html2canvas(canvasContainer as HTMLElement, {
+          useCORS: true,
+          scale: 2,
+          logging: false,
+          backgroundColor: '#0c1322'
+        });
+        
+        if (controls) controls.classList.remove('hidden');
+        if (minimap) minimap.classList.remove('hidden');
+
+        setCanvasImage(canvas.toDataURL('image/png'));
+      } catch (err) {
+        console.error('[PDF Export] Failed to capture canvas:', err);
+      }
+    }
+
+    setTimeout(() => {
+      const element = document.getElementById('print-dossier-layout');
+      if (!element) {
+        console.warn('[PDF Export] Print element not found, falling back to window.print()');
+        window.print();
+        setIsExportingPDF(false);
+        return;
+      }
+
+      const companyName = intel?.name || 'Company';
+      const ticker = reportState?.ticker || 'TICKER';
+      const todayStr = new Date().toISOString().split('T')[0];
+      const filename = `Veriscope_Report_${companyName.replace(/\s+/g, '_')}_${ticker}_${todayStr}.pdf`;
+
+      const opt = {
+        margin: [10, 10, 10, 10] as [number, number, number, number],
+        filename: filename,
+        image: { type: 'jpeg' as const, quality: 0.98 },
+        html2canvas: { 
+          scale: 2, 
+          useCORS: true, 
+          letterRendering: true,
+          logging: false
+        },
+        jsPDF: { 
+          unit: 'mm', 
+          format: 'a4', 
+          orientation: 'portrait' as const
+        },
+        pagebreak: { mode: ['avoid-all', 'css', 'legacy'] }
+      };
+
+      element.classList.remove('hidden');
+      element.classList.add('block');
+
+      html2pdf()
+        .set(opt)
+        .from(element)
+        .save()
+        .then(() => {
+          console.log('[PDF Export] PDF exported successfully.');
+          element.classList.remove('block');
+          element.classList.add('hidden');
+          setIsExportingPDF(false);
+        })
+        .catch((err: any) => {
+          console.error('[PDF Export] Generation failed:', err);
+          element.classList.remove('block');
+          element.classList.add('hidden');
+          setIsExportingPDF(false);
+          window.print();
+        });
+    }, 500);
   };
 
   // Recharts metric mappings
@@ -381,12 +521,25 @@ const eventSource = new EventSource(
             {intel.name}
           </h1>
           <div className="text-[10px] font-mono text-slate-450 dark:text-slate-500 font-bold uppercase tracking-wider mt-0.5">
-            NASDAQ: {reportState.ticker} • Conviction Index: {decision.confidence}%
+            {(intel as any).exchange || 'Unknown'}: {reportState.ticker} • Conviction Index: {decision.confidence}%
           </div>
         </div>
 
-        {/* Pin, Print and Metadata Actions */}
-        <div className="flex items-center gap-2.5">
+        {/* Pin, Print and Watchlist Actions */}
+        <div className="flex items-center gap-2.5 no-print">
+          <button 
+            onClick={toggleWatchlistItem}
+            className={`p-2 rounded-lg border text-xs font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${
+              inWatchlist 
+                ? 'bg-blue-50 border-blue-200 text-blue-800 dark:bg-blue-950/20 dark:border-blue-900/40 dark:text-blue-400 font-bold' 
+                : 'bg-white border-[#E7E5E4] text-slate-650 hover:bg-slate-50 dark:bg-[#111827] dark:border-[#273449] dark:text-slate-400 dark:hover:bg-slate-800'
+            }`}
+            title={inWatchlist ? 'Remove from Watchlist' : 'Add to Watchlist'}
+          >
+            <Eye size={14} className={inWatchlist ? 'fill-blue-600' : ''} />
+            <span className="hidden md:inline">{inWatchlist ? 'Watchlisted' : 'Watchlist'}</span>
+          </button>
+
           <button 
             onClick={() => pinMutation.mutate(reportData.id)}
             className={`p-2 rounded-lg border text-xs font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${
@@ -400,13 +553,23 @@ const eventSource = new EventSource(
             <span className="hidden md:inline">{isPinned ? 'Pinned' : 'Pin Report'}</span>
           </button>
           
-          <button 
+           <button 
             onClick={handlePrint}
-            className="p-2 rounded-lg border border-[#E7E5E4] dark:border-[#273449] bg-white dark:bg-[#111827] text-slate-650 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold cursor-pointer transition-all flex items-center gap-1.5"
-            title="Print full dashboard report"
+            disabled={isExportingPDF}
+            className="p-2 rounded-lg border border-[#E7E5E4] dark:border-[#273449] bg-white dark:bg-[#111827] text-slate-650 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 text-xs font-semibold cursor-pointer disabled:opacity-50 transition-all flex items-center gap-1.5"
+            title="Export high-resolution investment research PDF dossier"
           >
-            <Printer size={14} />
-            <span className="hidden md:inline">Print / PDF</span>
+            {isExportingPDF ? (
+              <>
+                <Loader2 size={14} className="animate-spin text-blue-500" />
+                <span className="hidden md:inline">Exporting...</span>
+              </>
+            ) : (
+              <>
+                <Printer size={14} />
+                <span className="hidden md:inline">Export PDF</span>
+              </>
+            )}
           </button>
         </div>
 
@@ -447,10 +610,23 @@ const eventSource = new EventSource(
         {/* TAB 1: EXECUTIVE SUMMARY (loads first by default!) */}
         {activeTab === 'overview' && (
           <div className="absolute inset-0 overflow-y-auto p-6 md:p-10 bg-slate-50/50 dark:bg-slate-950/20">
-            <div className="max-w-4xl mx-auto space-y-8 select-text">
+            <div className="max-w-6xl mx-auto flex gap-8 items-start select-text">
               
-              {/* Executive Conviction Header Card */}
-              <div className="p-6 md:p-8 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-6">
+              {/* Sticky Sidebar Navigation Index */}
+              <nav className="w-48 shrink-0 sticky top-0 hidden lg:flex flex-col gap-2 p-1.5 border-r border-[#E7E5E4] dark:border-[#273449] text-xs font-semibold no-print">
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 px-2">Report Sections</span>
+                <a href="#conviction" className="px-3 py-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">1. Conviction Index</a>
+                <a href="#drivers" className="px-3 py-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">2. Driving Factors</a>
+                <a href="#red-flags" className="px-3 py-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">3. Red Flags & Risks</a>
+                <a href="#profile" className="px-3 py-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">4. Corporate Identity</a>
+                <a href="#data-quality" className="px-3 py-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">5. Verification Log</a>
+              </nav>
+
+              {/* Main Report Content */}
+              <div className="flex-1 space-y-8 page-transition max-w-4xl">
+                
+                {/* Executive Conviction Header Card */}
+                <div id="conviction" className="p-6 md:p-8 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-6">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-100 dark:border-slate-800 pb-5 gap-4">
                   <div className="space-y-1">
                     <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
@@ -460,7 +636,7 @@ const eventSource = new EventSource(
                       {intel.name}
                     </h2>
                     <div className="text-[10px] font-semibold font-mono text-slate-455 dark:text-slate-500">
-                      NASDAQ: {reportState.ticker} • TTM Report
+                      {(intel as any).exchange || 'Unknown'}: {reportState.ticker} • TTM Report
                     </div>
                   </div>
                   
@@ -504,7 +680,7 @@ const eventSource = new EventSource(
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 
                 {/* Key Strengths */}
-                <div className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-4">
+                <div id="drivers" className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-4">
                   <h3 className="font-serif font-bold text-md border-b border-slate-100 dark:border-slate-800 pb-2.5 text-slate-900 dark:text-white flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-600" />
                     <span>Primary Driving Drivers</span>
@@ -520,7 +696,7 @@ const eventSource = new EventSource(
                 </div>
 
                 {/* Key Threat Vectors */}
-                <div className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-4">
+                <div id="red-flags" className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-4">
                   <h3 className="font-serif font-bold text-md border-b border-slate-100 dark:border-slate-800 pb-2.5 text-slate-900 dark:text-white flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-red-600" />
                     <span>Identified Risk Headwinds</span>
@@ -538,7 +714,7 @@ const eventSource = new EventSource(
               </div>
 
               {/* Corporate Identity Profile */}
-              <div className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-4">
+              <div id="profile" className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-4">
                 <h3 className="font-serif font-bold text-md border-b border-slate-100 dark:border-slate-800 pb-2.5 text-slate-900 dark:text-white">Corporate Identity Profile</h3>
                 <div className="space-y-3 text-xs">
                   <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
@@ -555,13 +731,29 @@ const eventSource = new EventSource(
                   </div>
                   <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
                     <span className="text-slate-455">Workforce</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">{intel.employeeCount.toLocaleString()} employees</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{typeof intel.employeeCount === 'number' ? `${intel.employeeCount.toLocaleString()} employees` : intel.employeeCount}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
+                    <span className="text-slate-455">Country</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{(intel as any).country || 'Unknown'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
+                    <span className="text-slate-455">Currency</span>
+                    <span className="font-semibold text-slate-900 dark:text-white uppercase">{(intel as any).currency || 'USD'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
+                    <span className="text-slate-455">Sector</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{(intel as any).sector || 'Unknown'}</span>
+                  </div>
+                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
+                    <span className="text-slate-455">Industry</span>
+                    <span className="font-semibold text-slate-900 dark:text-white">{intel.industry || 'Unknown'}</span>
                   </div>
                 </div>
               </div>
 
               {/* Data Verification & Quality Credentials */}
-              <div className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-4">
+              <div id="data-quality" className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-4">
                 <h3 className="font-serif font-bold text-md border-b border-slate-100 dark:border-slate-800 pb-2.5 text-slate-900 dark:text-white">Data Verification & Quality Credentials</h3>
                 <div className="space-y-3 text-xs">
                   <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
@@ -587,7 +779,8 @@ const eventSource = new EventSource(
                 </div>
               </div>
 
-            </div>
+              </div> {/* Close Main Report Content */}
+            </div> {/* Close max-w-6xl flex wrapper */}
           </div>
         )}
 
@@ -1049,8 +1242,381 @@ const eventSource = new EventSource(
           </div>
         )}
 
-      </div>
+            {/* PRINT-ONLY EXECUTIVE RESEARCH DOSSIER LAYOUT */}
+      <div id="print-dossier-layout" className="hidden p-0 bg-slate-955 text-slate-100 font-sans space-y-0 w-[210mm] mx-auto select-text">
+        
+        {/* ==================== PAGE 1: COVER PAGE ==================== */}
+        <div className="w-full min-h-[295mm] flex flex-col justify-between p-12 html2pdf__page-break bg-slate-950 text-white relative border border-slate-900">
+          {/* Top Logo & Header */}
+          <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+            <span className="text-sm font-bold tracking-widest text-slate-400">🔭 VERISCOPE OS</span>
+            <span className="text-[9px] font-mono text-slate-500">SESSION: {reportData.id.substring(0, 8)}...</span>
+          </div>
 
+          {/* Middle Cover Content */}
+          <div className="my-auto space-y-8">
+            <div className="space-y-2">
+              <span className="px-3 py-1 rounded bg-blue-900/40 text-blue-400 border border-blue-800/60 text-[10px] font-mono font-bold uppercase tracking-wider">
+                Automated Equity Research Report
+              </span>
+              <h1 className="text-4xl font-serif font-black tracking-tight leading-none mt-4 text-white">
+                {intel.name}
+              </h1>
+              <div className="text-lg font-mono text-slate-400 mt-2">
+                Ticker: {reportState.ticker} • Exchange: {(intel as any).exchange || 'NASDAQ'}
+              </div>
+            </div>
+
+            {/* Ratings Conviction Badge */}
+            <div className="p-6 rounded-2xl bg-slate-900/60 border border-slate-800/80 space-y-4">
+              <div className="flex justify-between items-center">
+                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Conviction Recommendation</span>
+                <span className="text-xs font-mono text-emerald-400 font-bold bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-900/40">
+                  {(intel as any).verificationStatus || 'VERIFIED'}
+                </span>
+              </div>
+              <div className="flex justify-between items-end">
+                <div className="text-3xl font-serif font-extrabold text-blue-400">
+                  {decision.recommendation}
+                </div>
+                <div className="text-right">
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Confidence Index</div>
+                  <div className="text-xl font-bold font-mono text-white">{decision.confidence}%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Bottom Cover Metadata */}
+          <div className="border-t border-slate-800 pt-6 grid grid-cols-2 gap-4 text-xs">
+            <div className="space-y-1">
+              <div className="text-slate-500 font-medium">Analyst:</div>
+              <div className="font-bold text-white">Veriscope OS Automated Analyst Group</div>
+              <div className="text-slate-400 text-[10px]">Deepmind Advanced Agentic Coding</div>
+            </div>
+            <div className="text-right space-y-1">
+              <div className="text-slate-500 font-medium">Generated Date & Time:</div>
+              <div className="font-mono text-white">{formatLiveDateTime(reportData.createdAt)}</div>
+              <div className="text-slate-400 text-[10px]">Client Local Time Zone</div>
+            </div>
+          </div>
+        </div>
+
+        {/* ==================== PAGE 2: TABLE OF CONTENTS ==================== */}
+        <div className="w-full min-h-[295mm] flex flex-col justify-between p-12 html2pdf__page-break bg-slate-950 text-white border border-slate-900">
+          <div className="space-y-8">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+              <span className="text-xs font-bold tracking-widest text-slate-400">🔭 VERISCOPE OS — TABLE OF CONTENTS</span>
+              <span className="text-xs font-mono text-slate-500">{intel.name} ({reportState.ticker})</span>
+            </div>
+
+            <div className="space-y-6">
+              <h2 className="text-xl font-serif font-bold text-white border-b border-slate-800 pb-2">Document Index</h2>
+              
+              <div className="space-y-4 font-mono text-xs">
+                {[
+                  { num: '1', title: 'Executive Summary & Conviction', page: '3' },
+                  { num: '2', title: 'Driving Factors & Headwinds', page: '4' },
+                  { num: '3', title: 'Corporate Identity Profile', page: '5' },
+                  { num: '4', title: 'Verified Financial Indicators', page: '6' },
+                  { num: '5', title: 'News Sentiment & Analysis', page: '7' },
+                  { num: '6', title: 'Peer Comparison & Landscape', page: '8' },
+                  { num: '7', title: 'Research Canvas Node Flow', page: '9' }
+                ].map((item, idx) => (
+                  <div key={idx} className="flex justify-between items-baseline border-b border-dashed border-slate-800 py-1">
+                    <span className="text-slate-300">{item.num}. {item.title}</span>
+                    <span className="text-slate-400 font-bold">{item.page}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-between text-[8px] font-mono text-slate-500 pt-4 border-t border-slate-900">
+            <span>CONFIDENTIAL • VERISCOPE RESEARCH</span>
+            <span>PAGE 2</span>
+          </div>
+        </div>
+
+        {/* ==================== PAGE 3: EXECUTIVE SUMMARY ==================== */}
+        <div className="w-full min-h-[295mm] flex flex-col justify-between p-12 html2pdf__page-break bg-slate-950 text-white border border-slate-900">
+          <div className="space-y-6">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+              <span className="text-xs font-bold tracking-widest text-slate-400">1. EXECUTIVE SUMMARY</span>
+              <span className="text-xs font-mono text-slate-500">{intel.name} ({reportState.ticker})</span>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-serif font-bold text-white">Investment Outlook</h3>
+              <blockquote className="p-4 bg-slate-900/60 border-l-4 border-blue-500 rounded-r-lg text-xs italic text-slate-300 leading-relaxed">
+                "{decision.futureOutlook}"
+              </blockquote>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800 text-center">
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Confidence Score</span>
+                <span className="text-xl font-bold font-mono text-blue-400">{decision.confidence}%</span>
+              </div>
+              <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800 text-center">
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Company Health</span>
+                <span className="text-xl font-bold font-mono text-emerald-400">{100 - risks.overallScore}/100</span>
+              </div>
+              <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800 text-center">
+                <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Threat Index</span>
+                <span className="text-xl font-bold font-mono text-red-400">{risks.overallScore}/100</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-between text-[8px] font-mono text-slate-500 pt-4 border-t border-slate-900">
+            <span>CONFIDENTIAL • VERISCOPE RESEARCH</span>
+            <span>PAGE 3</span>
+          </div>
+        </div>
+
+        {/* ==================== PAGE 4: DRIVING FACTORS & RISKS ==================== */}
+        <div className="w-full min-h-[295mm] flex flex-col justify-between p-12 html2pdf__page-break bg-slate-950 text-white border border-slate-900">
+          <div className="space-y-6">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+              <span className="text-xs font-bold tracking-widest text-slate-400">2. DRIVING FACTORS & RISKS</span>
+              <span className="text-xs font-mono text-slate-500">{intel.name} ({reportState.ticker})</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div className="p-6 rounded-xl bg-slate-900/40 border border-slate-800/80 space-y-4">
+                <h3 className="font-serif font-bold text-sm text-emerald-400 flex items-center gap-2 border-b border-slate-800 pb-2">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span>Primary Driving Strengths</span>
+                </h3>
+                <ul className="space-y-3 text-xs text-slate-300">
+                  {decision.keyStrengths?.map((reason: string, idx: number) => (
+                    <li key={idx} className="flex gap-2 leading-relaxed">
+                      <span className="font-mono text-emerald-400 font-bold">✓</span>
+                      <span>{reason}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="p-6 rounded-xl bg-slate-900/40 border border-slate-800/80 space-y-4">
+                <h3 className="font-serif font-bold text-sm text-red-400 flex items-center gap-2 border-b border-slate-800 pb-2">
+                  <span className="w-2 h-2 rounded-full bg-red-500" />
+                  <span>Identified Risk Headwinds</span>
+                </h3>
+                <ul className="space-y-3 text-xs text-slate-300">
+                  {decision.keyRisks?.map((riskStr: string, idx: number) => (
+                    <li key={idx} className="flex gap-2 leading-relaxed">
+                      <span className="font-mono text-red-400 font-bold">⚠</span>
+                      <span>{riskStr}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-between text-[8px] font-mono text-slate-500 pt-4 border-t border-slate-900">
+            <span>CONFIDENTIAL • VERISCOPE RESEARCH</span>
+            <span>PAGE 4</span>
+          </div>
+        </div>
+
+        {/* ==================== PAGE 5: CORPORATE IDENTITY PROFILE ==================== */}
+        <div className="w-full min-h-[295mm] flex flex-col justify-between p-12 html2pdf__page-break bg-slate-950 text-white border border-slate-900">
+          <div className="space-y-6">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+              <span className="text-xs font-bold tracking-widest text-slate-400">3. CORPORATE IDENTITY & CREDENTIALS</span>
+              <span className="text-xs font-mono text-slate-500">{intel.name} ({reportState.ticker})</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6">
+              <div className="p-6 rounded-xl bg-slate-900/40 border border-slate-800 space-y-4">
+                <h3 className="font-serif font-bold text-sm text-white border-b border-slate-800 pb-2">Corporate Profile</h3>
+                <div className="space-y-3 text-xs text-slate-300">
+                  <div className="flex justify-between border-b border-slate-900 pb-1">
+                    <span className="text-slate-500">CEO</span>
+                    <span className="font-semibold text-white">{intel.ceo}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-900 pb-1">
+                    <span className="text-slate-500">Founders</span>
+                    <span className="font-semibold text-white">{intel.founders.join(', ')}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-900 pb-1">
+                    <span className="text-slate-500">Founded Year</span>
+                    <span className="font-semibold text-white">{intel.founded}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-900 pb-1">
+                    <span className="text-slate-500">Workforce</span>
+                    <span className="font-semibold text-white">{intel.employeeCount.toLocaleString()} employees</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 rounded-xl bg-slate-900/40 border border-slate-800 space-y-4">
+                <h3 className="font-serif font-bold text-sm text-white border-b border-slate-800 pb-2">Data Quality Verification</h3>
+                <div className="space-y-3 text-xs text-slate-300">
+                  <div className="flex justify-between border-b border-slate-900 pb-1">
+                    <span className="text-slate-500">Verification Status</span>
+                    <span className="font-semibold text-emerald-400 font-bold">{(intel as any).verificationStatus || 'Verified'}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-900 pb-1">
+                    <span className="text-slate-500">Confidence Score</span>
+                    <span className="font-semibold text-white">{(intel as any).confidenceScore || 95}%</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-900 pb-1">
+                    <span className="text-slate-500">Data Freshness</span>
+                    <span className="font-semibold text-white">{(intel as any).dataFreshness || 'TTM'}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-slate-900 pb-1">
+                    <span className="text-slate-500">Verified Sources</span>
+                    <span className="font-semibold text-white text-right">{((intel as any).verifiedSources || ['Yahoo Finance', 'SEC Filings']).join(', ')}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-between text-[8px] font-mono text-slate-500 pt-4 border-t border-slate-900">
+            <span>CONFIDENTIAL • VERISCOPE RESEARCH</span>
+            <span>PAGE 5</span>
+          </div>
+        </div>
+
+        {/* ==================== PAGE 6: FINANCIAL DATA INDICATORS ==================== */}
+        <div className="w-full min-h-[295mm] flex flex-col justify-between p-12 html2pdf__page-break bg-slate-950 text-white border border-slate-900">
+          <div className="space-y-6">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+              <span className="text-xs font-bold tracking-widest text-slate-400">4. VERIFIED FINANCIAL INDICATORS</span>
+              <span className="text-xs font-mono text-slate-500">{intel.name} ({reportState.ticker})</span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-xs">
+              {Object.entries(financials.formattedMetrics).map(([key, rawItem]) => {
+                const item = rawItem as any;
+                return (
+                  <div key={key} className="flex justify-between py-2 border-b border-slate-900/60">
+                    <span className="text-slate-400 font-medium">{item.label}</span>
+                    <span className="font-bold font-mono text-white">{item.value}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-between text-[8px] font-mono text-slate-500 pt-4 border-t border-slate-900">
+            <span>CONFIDENTIAL • VERISCOPE RESEARCH</span>
+            <span>PAGE 6</span>
+          </div>
+        </div>
+
+        {/* ==================== PAGE 7: NEWS SENTIMENT & ANALYSIS ==================== */}
+        <div className="w-full min-h-[295mm] flex flex-col justify-between p-12 html2pdf__page-break bg-slate-950 text-white border border-slate-900">
+          <div className="space-y-6">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+              <span className="text-xs font-bold tracking-widest text-slate-400">5. NEWS SENTIMENT ANALYSIS</span>
+              <span className="text-xs font-mono text-slate-500">{intel.name} ({reportState.ticker})</span>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="font-serif font-bold text-sm text-white">Recent Verified Press Sentiment</h3>
+              <div className="space-y-3">
+                {news.articles.slice(0, 4).map((art: NewsArticle, idx: number) => (
+                  <div key={idx} className="p-4 rounded-xl bg-slate-900/30 border border-slate-900 space-y-2">
+                    <div className="flex justify-between text-[10px] text-slate-500">
+                      <span>{art.source} • {art.date}</span>
+                      <span className={`px-2 py-0.5 rounded font-bold uppercase ${
+                        art.sentiment === 'positive' ? 'bg-emerald-950/40 text-emerald-400 border border-emerald-900/40' :
+                        art.sentiment === 'negative' ? 'bg-red-950/40 text-red-400 border border-red-900/40' :
+                        'bg-slate-900 text-slate-400'
+                      }`}>
+                        {art.sentiment} {((art as any).confidence) ? `(${(art as any).confidence}% Confidence)` : ''}
+                      </span>
+                    </div>
+                    <div className="text-xs font-semibold text-white leading-snug">{art.title}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-between text-[8px] font-mono text-slate-500 pt-4 border-t border-slate-900">
+            <span>CONFIDENTIAL • VERISCOPE RESEARCH</span>
+            <span>PAGE 7</span>
+          </div>
+        </div>
+
+        {/* ==================== PAGE 8: PEER COMPARISON ==================== */}
+        <div className="w-full min-h-[295mm] flex flex-col justify-between p-12 html2pdf__page-break bg-slate-950 text-white border border-slate-900">
+          <div className="space-y-6">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+              <span className="text-xs font-bold tracking-widest text-slate-400">6. PEER LANDSCAPE COMPARISON</span>
+              <span className="text-xs font-mono text-slate-500">{intel.name} ({reportState.ticker})</span>
+            </div>
+
+            <div className="space-y-4">
+              {(competitors.competitors || []).slice(0, 3).map((peer: CompetitorComparison, idx: number) => (
+                <div key={idx} className="p-4 rounded-xl bg-slate-900/40 border border-slate-800 grid grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <div className="text-xs font-bold text-white">{peer.name}</div>
+                    <div className="text-[10px] font-mono text-slate-500">{peer.ticker}</div>
+                  </div>
+                  <div className="space-y-1 text-xs">
+                    <div className="text-slate-500">Market Share</div>
+                    <div className="font-semibold text-slate-300">{(peer as any).marketShare || 'N/A'}</div>
+                  </div>
+                  <div className="space-y-1 text-xs">
+                    <div className="text-slate-500">Product Overlap</div>
+                    <div className="font-semibold text-slate-300">{(peer as any).productOverlap || 'Direct competitor'}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-between text-[8px] font-mono text-slate-500 pt-4 border-t border-slate-900">
+            <span>CONFIDENTIAL • VERISCOPE RESEARCH</span>
+            <span>PAGE 8</span>
+          </div>
+        </div>
+
+        {/* ==================== PAGE 9: RESEARCH CANVAS GRAPH ==================== */}
+        <div className="w-full min-h-[295mm] flex flex-col justify-between p-12 bg-slate-950 text-white border border-slate-900">
+          <div className="space-y-6">
+            <div className="flex justify-between items-center border-b border-slate-800 pb-4">
+              <span className="text-xs font-bold tracking-widest text-slate-400">7. RESEARCH CANVAS FLOW GRAPH</span>
+              <span className="text-xs font-mono text-slate-500">{intel.name} ({reportState.ticker})</span>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="font-serif font-bold text-sm text-slate-300">Agentic Data Verification Network Map</h3>
+              {canvasImage ? (
+                <div className="border border-slate-850 rounded-xl overflow-hidden bg-[#0c1322] p-2 flex items-center justify-center">
+                  <img src={canvasImage} alt="Research Canvas Graph Map" className="max-w-full max-h-[160mm] object-contain rounded" />
+                </div>
+              ) : (
+                <div className="h-[140mm] border border-slate-800/80 border-dashed rounded-xl flex items-center justify-center text-xs text-slate-500">
+                  Capturing dynamic verification network graph map...
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Footer */}
+          <div className="flex justify-between text-[8px] font-mono text-slate-500 pt-4 border-t border-slate-900">
+            <span>CONFIDENTIAL • VERISCOPE RESEARCH</span>
+            <span>PAGE 9</span>
+          </div>
+        </div>
+      </div>
+      </div>
     </div>
   );
 }

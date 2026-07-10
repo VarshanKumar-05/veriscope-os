@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Loader2, Terminal } from 'lucide-react';
 import type { AgentLog } from '../types/shared.ts';
@@ -12,6 +12,14 @@ interface LoadingScreenProps {
 
 export default function LoadingScreen({ ticker, status, progress, logs }: LoadingScreenProps) {
   const terminalEndRef = useRef<HTMLDivElement>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setElapsedTime(prev => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Auto-scroll the agent log console
   useEffect(() => {
@@ -95,6 +103,11 @@ export default function LoadingScreen({ ticker, status, progress, logs }: Loadin
                 animate={{ width: `${progress}%` }}
                 transition={{ duration: 0.5, ease: 'easeOut' }}
               />
+            </div>
+            {/* Live Timer and Estimates */}
+            <div className="flex justify-between items-center text-[10px] font-mono text-slate-400 dark:text-slate-500 pt-1">
+              <div>Elapsed: <span className="text-slate-600 dark:text-slate-300 font-bold">{elapsedTime}s</span></div>
+              <div>Est. Remaining: <span className="text-slate-600 dark:text-slate-300 font-bold">{Math.max(0, 45 - elapsedTime)}s</span></div>
             </div>
           </div>
 

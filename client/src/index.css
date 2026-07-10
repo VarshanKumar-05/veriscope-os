@@ -6,25 +6,47 @@
 :root {
   --background: #F8F7F4;
   --surface: #FFFFFF;
+  --elevated-surface: #FFFFFF;
   --text-primary: #111827;
   --text-secondary: #64748B;
   --border: #E7E5E4;
+  --divider: #E7E5E4;
   --primary: #3B82F6;
-  --success: #22C55E;
+  --secondary: #64748B;
+  --accent: #2563EB;
+  --success: #10B981;
   --warning: #F59E0B;
   --danger: #EF4444;
+  --hover: rgba(59, 130, 246, 0.05);
+  --selection: rgba(59, 130, 246, 0.15);
+  --disabled: #F1F5F9;
+  --shadow: 0 1px 3px rgba(0,0,0,0.05), 0 1px 2px rgba(0,0,0,0.02);
+  --shadow-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+  --scrollbar-thumb: rgba(17, 24, 39, 0.12);
+  --scrollbar-track: transparent;
 }
 
 .dark {
   --background: #0B1220;
   --surface: #111827;
+  --elevated-surface: #1E293B;
   --text-primary: #F9FAFB;
   --text-secondary: #94A3B8;
   --border: #273449;
+  --divider: #1E293B;
   --primary: #3B82F6;
-  --success: #22C55E;
+  --secondary: #94A3B8;
+  --accent: #3B82F6;
+  --success: #10B981;
   --warning: #F59E0B;
   --danger: #EF4444;
+  --hover: rgba(59, 130, 246, 0.12);
+  --selection: rgba(59, 130, 246, 0.25);
+  --disabled: #1E293B;
+  --shadow: 0 4px 6px -1px rgba(0,0,0,0.15), 0 2px 4px -1px rgba(0,0,0,0.08);
+  --shadow-hover: 0 20px 25px -5px rgba(0, 0, 0, 0.3), 0 10px 10px -5px rgba(0, 0, 0, 0.2);
+  --scrollbar-thumb: rgba(249, 250, 251, 0.15);
+  --scrollbar-track: transparent;
 }
 
 @theme {
@@ -39,11 +61,8 @@
   --color-danger-custom: var(--danger);
 
   /* Shared Accent/Status Colors */
-  --color-secondary-custom: #CBD5E1;
-  --color-accent-custom: #3B82F6;
-  --color-success-custom: #22C55E;
-  --color-warning-custom: #F59E0B;
-  --color-danger-custom: #EF4444;
+  --color-secondary-custom: var(--secondary);
+  --color-accent-custom: var(--accent);
 
   /* Typography Fonts */
   --font-heading: "Manrope", sans-serif;
@@ -57,14 +76,24 @@
     color: var(--text-primary);
     font-family: var(--font-sans);
     overflow-x: hidden;
-    transition: background-color 0.2s ease, color 0.2s ease;
+    transition: background-color 300ms cubic-bezier(0.4, 0, 0.2, 1), color 300ms cubic-bezier(0.4, 0, 0.2, 1), border-color 300ms cubic-bezier(0.4, 0, 0.2, 1);
   }
   
   h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-heading);
     font-weight: 700;
     color: var(--text-primary);
-    transition: color 0.2s ease;
+    transition: color 300ms cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Accessibility Keyboard Focus Indicators */
+  *:focus-visible {
+    outline: 2px solid var(--primary) !important;
+    outline-offset: 2px !important;
+  }
+
+  ::selection {
+    background-color: var(--selection) !important;
   }
 }
 
@@ -204,16 +233,118 @@
   }
 }
 
+/* Premium Micro Animations & Transitions */
+.transition-theme {
+  transition: background-color 300ms cubic-bezier(0.4, 0, 0.2, 1), border-color 300ms cubic-bezier(0.4, 0, 0.2, 1), color 300ms cubic-bezier(0.4, 0, 0.2, 1), fill 300ms cubic-bezier(0.4, 0, 0.2, 1), stroke 300ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 300ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button:hover:not(:disabled), .btn-premium:hover {
+  transform: translateY(-1px) scale(1.02);
+  box-shadow: var(--shadow-hover);
+}
+button:active:not(:disabled) {
+  transform: translateY(0px) scale(0.98);
+}
+button, .btn-premium {
+  transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.card-premium {
+  transition: transform 200ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 200ms cubic-bezier(0.4, 0, 0.2, 1), border-color 200ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+.card-premium:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-hover);
+}
+
+/* Page transitions */
+.page-transition {
+  animation: page-enter 350ms cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Scrollbar variables mapping */
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 3px;
+  transition: background 300ms ease;
+}
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-secondary);
+}
+
 /* Typography styles for printable reports */
 @media print {
-  body {
-    background-color: white !important;
-    color: black !important;
+  @page {
+    size: A4 landscape;
+    margin: 1.5cm;
   }
-  .no-print {
+
+  body {
+    background: #ffffff !important;
+    background-color: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt !important;
+    line-height: 1.5 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide interactive/non-report UI elements */
+  nav,
+  header,
+  aside,
+  button,
+  .no-print,
+  .react-flow__controls,
+  .react-flow__minimap,
+  .search-container,
+  .tabs-container {
     display: none !important;
   }
+
+  /* Clean up container layouts for print */
+  .h-full, 
+  .min-h-screen,
+  .overflow-hidden,
+  .overflow-y-auto {
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    position: static !important;
+  }
+
+  /* Layout adjustments */
+  .grid {
+    display: grid !important;
+    gap: 1.5rem !important;
+  }
+
+  /* Prevent components from splitting across pages */
+  .p-6,
+  .rounded-2xl,
+  .card,
+  tr,
+  section {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
   .print-page-break {
-    page-break-before: always;
+    page-break-before: always !important;
+    break-before: page !important;
   }
 }
