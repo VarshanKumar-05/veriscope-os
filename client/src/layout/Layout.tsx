@@ -19,15 +19,18 @@ import {
   Archive
 } from 'lucide-react';
 import { fetchHistory, togglePin, deleteReport, getExportUrl, fetchSearch, type SearchSuggestion } from '../services/api.js';
+import { useTheme } from '../providers/ThemeProvider';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [darkTheme, setDarkTheme] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const [searchSuggestions, setSearchSuggestions] = useState<SearchSuggestion[]>([]);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showProfileCard, setShowProfileCard] = useState(false);
+  
+  const { theme, toggleTheme } = useTheme();
+  const darkTheme = theme === 'dark';
   
   const navigate = useNavigate();
   const { id } = useParams();
@@ -106,43 +109,7 @@ export default function Layout() {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [darkTheme, navigate]);
-
-  // Sync theme (detecting system theme defaults if storage is empty)
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('theme');
-    let isDark = false;
-    if (savedTheme) {
-      isDark = savedTheme === 'dark';
-    } else {
-      isDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    }
-    setDarkTheme(isDark);
-    if (isDark) {
-      document.documentElement.classList.add('dark');
-      document.body.classList.add('bg-blueprint-dark');
-      document.body.classList.remove('bg-blueprint');
-    } else {
-      document.documentElement.classList.remove('dark');
-      document.body.classList.add('bg-blueprint');
-      document.body.classList.remove('bg-blueprint-dark');
-    }
-  }, []);
-
-  const toggleTheme = () => {
-    const nextDark = !darkTheme;
-    setDarkTheme(nextDark);
-    localStorage.setItem('theme', nextDark ? 'dark' : 'light');
-    if (nextDark) {
-      document.documentElement.classList.add('dark');
-      document.body.classList.add('bg-blueprint-dark');
-      document.body.classList.remove('bg-blueprint');
-    } else {
-      document.documentElement.classList.remove('dark');
-      document.body.classList.add('bg-blueprint');
-      document.body.classList.remove('bg-blueprint-dark');
-    }
-  };
-
+  // Theme is now managed by ThemeProvider
   useEffect(() => {
     if (searchQuery.trim().length < 2) {
       setSearchSuggestions([]);
@@ -438,8 +405,8 @@ export default function Layout() {
           {showProfileCard && (
             <div className="p-3 bg-white dark:bg-slate-900 border border-[#E7E5E4] dark:border-[#273449] rounded-lg shadow-md text-[11px] space-y-2">
               <div className="font-bold text-slate-900 dark:text-white">Workspace Analyst</div>
-              <div className="text-slate-400">Varsha Suresh</div>
-              <div className="text-[10px] font-mono text-slate-500">Varsha.Suresh@gemini.net</div>
+              <div className="text-slate-400">Varshan Kumar</div>
+              <div className="text-slate-500 font-mono mt-1">Varshankumarchadaram@gmail.com</div>
             </div>
           )}
         </div>

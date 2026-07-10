@@ -71,6 +71,10 @@
 }
 
 @layer base {
+  * {
+    @apply transition-colors duration-300;
+  }
+
   body {
     background-color: var(--background);
     color: var(--text-primary);

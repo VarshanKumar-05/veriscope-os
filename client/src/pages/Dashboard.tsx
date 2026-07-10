@@ -48,6 +48,7 @@ import html2canvas from 'html2canvas';
 
 import { fetchReport, togglePin } from '../services/api.js';
 import LoadingScreen from '../components/LoadingScreen.tsx';
+import { useTheme } from '../providers/ThemeProvider.tsx';
 import { 
   EvidenceNode, 
   FinancialNode, 
@@ -77,6 +78,7 @@ export default function Dashboard() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { theme } = useTheme();
 
   const formatLiveDateTime = (dateVal?: string | Date) => {
     const d = dateVal ? new Date(dateVal) : new Date();
@@ -484,16 +486,19 @@ const eventSource = new EventSource(
         .save()
         .then(() => {
           console.log('[PDF Export] PDF exported successfully.');
-          element.classList.remove('block');
-          element.classList.add('hidden');
-          setIsExportingPDF(false);
         })
         .catch((err: any) => {
           console.error('[PDF Export] Generation failed:', err);
+          window.print();
+        })
+        .finally(() => {
+          // Robust cleanup to prevent unresponsiveness bugs
           element.classList.remove('block');
           element.classList.add('hidden');
           setIsExportingPDF(false);
-          window.print();
+          document.body.style.pointerEvents = 'auto';
+          document.body.style.overflow = 'auto';
+          document.querySelectorAll('.html2canvas-container').forEach(e => e.remove());
         });
     }, 500);
   };
@@ -683,7 +688,7 @@ const eventSource = new EventSource(
                 <div id="drivers" className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-4">
                   <h3 className="font-serif font-bold text-md border-b border-slate-100 dark:border-slate-800 pb-2.5 text-slate-900 dark:text-white flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-600" />
-                    <span>Primary Driving Drivers</span>
+                    <span>Primary Driving Factors</span>
                   </h3>
                   <ul className="space-y-3 text-xs text-slate-655 dark:text-slate-400">
                     {decision.keyStrengths?.map((reason: string, idx: number) => (
@@ -793,13 +798,18 @@ const eventSource = new EventSource(
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               nodeTypes={nodeTypes}
+              colorMode={theme}
+              defaultEdgeOptions={{ animated: true, type: 'smoothstep' }}
               fitView
               fitViewOptions={{ padding: 0.15 }}
               minZoom={0.2}
               maxZoom={1.5}
+              panOnScroll={true}
+              panOnDrag={true}
+              proOptions={{ hideAttribution: true }}
             >
-              <Background gap={20} size={1} color="#e2e8f0" />
-              <Controls position="bottom-right" />
+              <Background gap={20} size={1} color={theme === 'dark' ? '#334155' : '#e2e8f0'} />
+              <Controls position="bottom-right" className="bg-white dark:bg-slate-900 shadow-md border border-slate-200 dark:border-slate-800 fill-slate-700 dark:fill-slate-300" />
               <MiniMap 
                 nodeColor={(node) => {
                   if (node.type === 'recommendationNode') return '#0f172a';
