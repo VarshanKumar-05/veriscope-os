@@ -64,7 +64,7 @@ async function callGemini(prompt: string, expectJson: boolean = false): Promise<
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Gemini API key is not configured.');
 
-  const model = 'gemini-1.5-flash';
+  const model = 'gemini-3.1-flash-lite';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
   const response = await fetchWithTimeout(url, {
