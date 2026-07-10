@@ -5,8 +5,18 @@ import apiRouter from './routes/api.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
-// Load environment variables
-dotenv.config();
+// Load environment variables from different possible directories
+const envPaths = [
+  path.resolve(process.cwd(), '.env'),
+  path.resolve(process.cwd(), '../.env'),
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '.env'),
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '.env'),
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '.env'),
+  path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', '..', '..', '.env')
+];
+for (const envPath of envPaths) {
+  dotenv.config({ path: envPath });
+}
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -18,7 +28,13 @@ const allowedOrigins = process.env.CORS_ORIGIN
 
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.indexOf(origin) !== -1 || allowedOrigins.includes('*')) {
+    if (
+      !origin || 
+      allowedOrigins.indexOf(origin) !== -1 || 
+      allowedOrigins.includes('*') ||
+      origin.startsWith('http://localhost:') ||
+      origin.startsWith('http://127.0.0.1:')
+    ) {
       callback(null, true);
     } else {
       callback(new Error('Not allowed by CORS'));

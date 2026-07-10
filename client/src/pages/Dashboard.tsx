@@ -110,8 +110,13 @@ export default function Dashboard() {
     setStreamLogs([]);
     setStreamState(null);
 
-    const eventSource = new EventSource(`http://localhost:5000/api/research/stream?id=${id}`);
+const API_URL =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.DEV ? 'http://localhost:5000' : window.location.origin);
 
+const eventSource = new EventSource(
+  `${API_URL}/api/research/stream?id=${id}`
+);
     eventSource.onmessage = (event) => {
       try {
         const update = JSON.parse(event.data);
@@ -134,7 +139,17 @@ export default function Dashboard() {
     eventSource.addEventListener('error', (event: any) => {
       console.error('SSE connection error:', event);
       eventSource.close();
-      setStreamError(event.data ? JSON.parse(event.data).message : 'Connection dropped unexpectedly.');
+      
+      let errMsg = 'Connection dropped unexpectedly.';
+      if (event.data) {
+        try {
+          const parsed = JSON.parse(event.data);
+          errMsg = parsed.message || errMsg;
+        } catch (e) {
+          errMsg = event.data;
+        }
+      }
+      setStreamError(errMsg);
     });
 
     return () => {
@@ -272,18 +287,6 @@ export default function Dashboard() {
     setEdges([...evidenceEdges, financialEdge, riskEdge]);
   }, [reportState]);
 
-  // Show stream loading screen if pipeline is currently executing
-  if (isStreamingRequested || (reportState && reportState.status !== 'completed' && reportState.status !== 'failed')) {
-    return (
-      <LoadingScreen
-        ticker={id ? id.split('_')[0] : 'AAPL'}
-        status={reportState?.status || 'planning'}
-        progress={reportState?.progress || 0}
-        logs={streamLogs.length > 0 ? streamLogs : (reportState?.logs || [])}
-      />
-    );
-  }
-
   // Handle errors or missing reports
   if (streamError || reportState?.status === 'failed') {
     return (
@@ -294,7 +297,7 @@ export default function Dashboard() {
           </div>
           <h3 className="font-serif font-bold text-lg text-slate-900 dark:text-white">Research Run Interrupted</h3>
           <p className="text-xs text-slate-500">
-            {streamError || 'The agent graph encountered a runtime decision threshold boundary exception.'}
+            {streamError || reportState?.error || 'The agent graph encountered a runtime decision threshold boundary exception.'}
           </p>
           <button 
             onClick={() => navigate('/')}
@@ -304,6 +307,18 @@ export default function Dashboard() {
           </button>
         </div>
       </div>
+    );
+  }
+
+  // Show stream loading screen if pipeline is currently executing
+  if (isStreamingRequested || (reportState && reportState.status !== 'completed')) {
+    return (
+      <LoadingScreen
+        ticker={id ? id.split('_')[0] : 'AAPL'}
+        status={reportState?.status || 'planning'}
+        progress={reportState?.progress || 0}
+        logs={streamLogs.length > 0 ? streamLogs : (reportState?.logs || [])}
+      />
     );
   }
 

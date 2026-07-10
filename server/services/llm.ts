@@ -12,11 +12,54 @@ import {
   RiskItem
 } from '../../shared/types.js';
 
-// Unified helper to check if we can run Live LLM
+// Helper to check if we can run Live LLM
 export function hasLLMCredentials(): boolean {
-  return !!(process.env.GEMINI_API_KEY || process.env.OPENAI_API_KEY);
+  const gemini = process.env.GEMINI_API_KEY;
+  const openai = process.env.OPENAI_API_KEY;
+  
+  const isValid = (key?: string) => {
+    if (!key) return false;
+    const clean = key.trim();
+    return clean.length > 0 && 
+           !clean.includes('PLACEHOLDER') && 
+           !clean.startsWith('your_') && 
+           clean !== 'null' && 
+           clean !== 'undefined';
+  };
+
+  return (!!gemini && isValid(gemini)) || (!!openai && isValid(openai));
 }
 
+// Helper to fetch with timeout using AbortController
+async function fetchWithTimeout(url: string, options: any = {}, timeoutMs: number = 30000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+      throw new Error(`API request timed out after ${timeoutMs / 1000} seconds`);
+    }
+    throw error;
+  }
+}
+
+// Clean markdown code blocks or invalid whitespace out of JSON responses
+function cleanJson(text: string): string {
+  let cleaned = text.trim();
+  if (cleaned.startsWith('```')) {
+    cleaned = cleaned.replace(/^```(?:json)?/, '').replace(/```$/, '').trim();
+  }
+  return cleaned;
+}
+
+// Raw Gemini API caller
 async function callGemini(prompt: string, expectJson: boolean = false): Promise<string> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) throw new Error('Gemini API key is not configured.');
@@ -24,14 +67,14 @@ async function callGemini(prompt: string, expectJson: boolean = false): Promise<
   const model = 'gemini-1.5-flash';
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
 
-  const response = await fetch(url, {
+  const response = await fetchWithTimeout(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
       generationConfig: expectJson ? { responseMimeType: 'application/json' } : undefined
     })
-  });
+  }, 30000); // 30 seconds timeout
 
   if (!response.ok) {
     const errText = await response.text();
@@ -44,11 +87,36 @@ async function callGemini(prompt: string, expectJson: boolean = false): Promise<
   return text;
 }
 
+// Retry caller wrapper with exponential backoff
+async function callGeminiWithRetry(prompt: string, expectJson: boolean = false): Promise<string> {
+  const maxRetries = 3;
+  let delay = 1000;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      console.log(`[Gemini] Attempt ${attempt}/${maxRetries} started`);
+      const text = await callGemini(prompt, expectJson);
+      console.log(`[Gemini] Attempt ${attempt} succeeded`);
+      return text;
+    } catch (error: any) {
+      console.error(`[Gemini] Attempt ${attempt} failed:`, error.message);
+      if (attempt === maxRetries) {
+        throw error;
+      }
+      console.log(`[Gemini] Retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      delay *= 2;
+    }
+  }
+  throw new Error('Gemini call failed after all retries');
+}
+
+// Raw OpenAI API caller with timeout
 async function callOpenAI(prompt: string, expectJson: boolean = false): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OpenAI API key is not configured.');
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetchWithTimeout('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -59,7 +127,7 @@ async function callOpenAI(prompt: string, expectJson: boolean = false): Promise<
       messages: [{ role: 'user', content: prompt }],
       response_format: expectJson ? { type: 'json_object' } : undefined
     })
-  });
+  }, 30000); // 30 seconds timeout
 
   if (!response.ok) {
     const errText = await response.text();
@@ -74,7 +142,7 @@ async function callOpenAI(prompt: string, expectJson: boolean = false): Promise<
 
 async function queryLLM(prompt: string, expectJson: boolean = false): Promise<string> {
   if (process.env.GEMINI_API_KEY) {
-    return callGemini(prompt, expectJson);
+    return callGeminiWithRetry(prompt, expectJson);
   } else if (process.env.OPENAI_API_KEY) {
     return callOpenAI(prompt, expectJson);
   }
@@ -89,6 +157,7 @@ export async function runPlannerAgent(ticker: string, useMock: boolean = false):
   const cleanTicker = ticker.toUpperCase().trim();
   
   if (useMock || !hasLLMCredentials()) {
+    console.log(`[Planner] Running in Mock/Sandbox mode for ${cleanTicker}`);
     return [
       { id: '1', task: 'Gather core corporate profile and operations model', status: 'completed', agent: 'Company Intel' },
       { id: '2', task: 'Fetch income statements and compute financial ratios', status: 'completed', agent: 'Financial Analyst' },
@@ -101,6 +170,8 @@ export async function runPlannerAgent(ticker: string, useMock: boolean = false):
   }
 
   try {
+    console.log("[Planner] Started");
+    console.log("[Planner] Gemini Request");
     const prompt = `You are the Lead Research Planner for Veriscope. The user wants to research the public company with ticker: "${cleanTicker}".
 Generate a specific 7-step checklist of tasks that the specialized agents must complete to produce an investment rating.
 Return your response ONLY as a JSON array of ResearchPlanItem objects. Do not include markdown code fence blocks.
@@ -118,10 +189,14 @@ Example output:
 ]`;
 
     const result = await queryLLM(prompt, true);
-    return JSON.parse(result.replace(/```json/g, '').replace(/```/g, '').trim());
-  } catch (error) {
-    console.warn('Planner agent failed, falling back:', error);
-    return runPlannerAgent(ticker, true);
+    console.log("[Planner] Gemini Response received");
+    const cleaned = cleanJson(result);
+    const parsed = JSON.parse(cleaned);
+    console.log("[Planner] Parsed Successfully");
+    return parsed;
+  } catch (error: any) {
+    console.error("[Planner] Failed:", error);
+    throw new Error(`Planner Agent failed: ${error.message}`);
   }
 }
 
@@ -133,12 +208,16 @@ export async function runCompetitorAgent(
 ): Promise<CompetitorData> {
   const cleanTicker = ticker.toUpperCase().trim();
   
-  if (useMock || !hasLLMCredentials() || MOCK_DATABASE[cleanTicker]) {
+  // Only use base mock databases if explicitly forced sandbox or missing credentials
+  if (useMock || !hasLLMCredentials()) {
+    console.log(`[Competitor Analyst] Running in Mock/Sandbox mode for ${cleanTicker}`);
     const fallbackTicker = MOCK_DATABASE[cleanTicker] ? cleanTicker : 'AAPL';
     return MOCK_DATABASE[fallbackTicker].competitors;
   }
 
   try {
+    console.log("[Competitor Analyst] Started");
+    console.log("[Competitor Analyst] Gemini Request");
     const prompt = `You are a Competitor Analyst. Research competitors for "${intel.name}" (${cleanTicker}) in the ${intel.industry} sector.
 Using these financials: Revenue=${financials.metrics.revenue}, MarketCap=${financials.metrics.marketCap}.
 Suggest 2-3 major competitors and score their Relative profitability (0-100), relative valuation (P/E or score), and innovation (0-100).
@@ -160,10 +239,14 @@ interface CompetitorData {
 Format exactly as raw JSON without markdown formatting.`;
 
     const result = await queryLLM(prompt, true);
-    return JSON.parse(result.replace(/```json/g, '').replace(/```/g, '').trim());
-  } catch (error) {
-    console.warn('Competitor agent failed, falling back:', error);
-    return runCompetitorAgent(ticker, intel, financials, true);
+    console.log("[Competitor Analyst] Gemini Response received");
+    const cleaned = cleanJson(result);
+    const parsed = JSON.parse(cleaned);
+    console.log("[Competitor Analyst] Parsed Successfully");
+    return parsed;
+  } catch (error: any) {
+    console.error("[Competitor Analyst] Failed:", error);
+    throw new Error(`Competitor Agent failed: ${error.message}`);
   }
 }
 
@@ -176,12 +259,15 @@ export async function runRiskAgent(
 ): Promise<RiskData> {
   const cleanTicker = ticker.toUpperCase().trim();
 
-  if (useMock || !hasLLMCredentials() || MOCK_DATABASE[cleanTicker]) {
+  if (useMock || !hasLLMCredentials()) {
+    console.log(`[Risk Analyst] Running in Mock/Sandbox mode for ${cleanTicker}`);
     const fallbackTicker = MOCK_DATABASE[cleanTicker] ? cleanTicker : 'AAPL';
     return MOCK_DATABASE[fallbackTicker].risks;
   }
 
   try {
+    console.log("[Risk Analyst] Started");
+    console.log("[Risk Analyst] Gemini Request");
     const prompt = `You are a Risk Assessment Analyst for "${intel.name}" (${cleanTicker}).
 Analyze specific risks for this company based on its industry (${intel.industry}) and revenue size (${financials.formattedMetrics.revenue.value}).
 Rate risk categories: Regulatory, Competition, Technology, Supply Chain, and Financial.
@@ -198,10 +284,14 @@ interface RiskData {
 Format exactly as raw JSON without markdown formatting.`;
 
     const result = await queryLLM(prompt, true);
-    return JSON.parse(result.replace(/```json/g, '').replace(/```/g, '').trim());
-  } catch (error) {
-    console.warn('Risk agent failed, falling back:', error);
-    return runRiskAgent(ticker, intel, financials, news, true);
+    console.log("[Risk Analyst] Gemini Response received");
+    const cleaned = cleanJson(result);
+    const parsed = JSON.parse(cleaned);
+    console.log("[Risk Analyst] Parsed Successfully");
+    return parsed;
+  } catch (error: any) {
+    console.error("[Risk Analyst] Failed:", error);
+    throw new Error(`Risk Agent failed: ${error.message}`);
   }
 }
 
@@ -216,8 +306,8 @@ export async function runEvidenceAgent(
 ): Promise<EvidenceCard[]> {
   const cleanTicker = ticker.toUpperCase().trim();
 
-  if (useMock || !hasLLMCredentials() || MOCK_DATABASE[cleanTicker]) {
-    // Generate default evidence cards from our mock if they exist
+  if (useMock || !hasLLMCredentials()) {
+    console.log(`[Evidence Builder] Running in Mock/Sandbox mode for ${cleanTicker}`);
     const base = MOCK_DATABASE[cleanTicker] ? cleanTicker : 'AAPL';
     const comp = MOCK_DATABASE[base];
     return [
@@ -230,6 +320,8 @@ export async function runEvidenceAgent(
   }
 
   try {
+    console.log("[Evidence Builder] Started");
+    console.log("[Evidence Builder] Gemini Request");
     const prompt = `You are an Evidence Agent. Review all compiled facts:
 Company Name: ${intel.name}
 Revenue: ${financials.formattedMetrics.revenue.value}
@@ -250,10 +342,14 @@ interface EvidenceCard {
 Format exactly as raw JSON without markdown formatting.`;
 
     const result = await queryLLM(prompt, true);
-    return JSON.parse(result.replace(/```json/g, '').replace(/```/g, '').trim());
-  } catch (error) {
-    console.warn('Evidence agent failed, falling back:', error);
-    return runEvidenceAgent(ticker, intel, financials, news, competitors, risks, true);
+    console.log("[Evidence Builder] Gemini Response received");
+    const cleaned = cleanJson(result);
+    const parsed = JSON.parse(cleaned);
+    console.log("[Evidence Builder] Parsed Successfully");
+    return parsed;
+  } catch (error: any) {
+    console.error("[Evidence Builder] Failed:", error);
+    throw new Error(`Evidence Agent failed: ${error.message}`);
   }
 }
 
@@ -269,12 +365,15 @@ export async function runDecisionAgent(
 ): Promise<Decision> {
   const cleanTicker = ticker.toUpperCase().trim();
 
-  if (useMock || !hasLLMCredentials() || MOCK_DATABASE[cleanTicker]) {
+  if (useMock || !hasLLMCredentials()) {
+    console.log(`[Decision Maker] Running in Mock/Sandbox mode for ${cleanTicker}`);
     const fallbackTicker = MOCK_DATABASE[cleanTicker] ? cleanTicker : 'AAPL';
     return MOCK_DATABASE[fallbackTicker].decision;
   }
 
   try {
+    console.log("[Decision Maker] Started");
+    console.log("[Decision Maker] Gemini Request");
     const prompt = `You are the Lead Investment Decision Agent for Veriscope. Review the research folder for "${intel.name}" (${cleanTicker}):
 Financial Metrics: P/E=${financials.formattedMetrics.peRatio.value}, Growth=${financials.formattedMetrics.revenueGrowth.value}, Operating Margin=${financials.formattedMetrics.operatingMargin.value}
 News Sentiment: Positive ${news.sentimentSummary.positive}%, Neutral ${news.sentimentSummary.neutral}%, Negative ${news.sentimentSummary.negative}%
@@ -296,9 +395,13 @@ interface Decision {
 Format exactly as raw JSON without markdown formatting.`;
 
     const result = await queryLLM(prompt, true);
-    return JSON.parse(result.replace(/```json/g, '').replace(/```/g, '').trim());
-  } catch (error) {
-    console.warn('Decision agent failed, falling back:', error);
-    return runDecisionAgent(ticker, intel, financials, news, competitors, risks, evidence, true);
+    console.log("[Decision Maker] Gemini Response received");
+    const cleaned = cleanJson(result);
+    const parsed = JSON.parse(cleaned);
+    console.log("[Decision Maker] Parsed Successfully");
+    return parsed;
+  } catch (error: any) {
+    console.error("[Decision Maker] Failed:", error);
+    throw new Error(`Decision Agent failed: ${error.message}`);
   }
 }

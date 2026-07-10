@@ -4,23 +4,44 @@ import { FinancialData } from '../../shared/types.js';
 
 const yf = yahooFinance as any;
 
+// Helper to wrap any Promise with a timeout limit
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number = 20000, name: string = 'Operation'): Promise<T> {
+  let timeoutId: any;
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${name} timed out after ${timeoutMs / 1000} seconds`));
+    }, timeoutMs);
+  });
+  
+  try {
+    const result = await Promise.race([promise, timeoutPromise]);
+    clearTimeout(timeoutId);
+    return result;
+  } catch (error) {
+    clearTimeout(timeoutId);
+    throw error;
+  }
+}
+
 export async function getFinancials(ticker: string, useMock: boolean = false): Promise<FinancialData> {
   const cleanTicker = ticker.toUpperCase().trim();
 
   // If mock mode is forced, or if it is one of our pre-configured sandbox tickers and we are running offline/demo, return mock
-  if (useMock || MOCK_DATABASE[cleanTicker]) {
-    if (MOCK_DATABASE[cleanTicker]) {
-      return MOCK_DATABASE[cleanTicker].financials;
-    }
+  if (useMock || !process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY) {
+    console.log(`[Financial Analyst] Running in Mock/Sandbox mode for ${cleanTicker}`);
+    const fallbackTicker = MOCK_DATABASE[cleanTicker] ? cleanTicker : 'AAPL';
+    return MOCK_DATABASE[fallbackTicker].financials;
   }
 
   try {
-    // 1. Fetch live stock quotes
-    const quote = await yf.quote(cleanTicker);
-    // 2. Fetch financial summary details
-    const summary = await yf.quoteSummary(cleanTicker, {
+    console.log(`[Financial Analyst] Requesting Yahoo Finance quotes for ${cleanTicker}`);
+    // Wrap the yfinance calls in our timeout wrapper (15 seconds limit)
+    const quote = await withTimeout(yf.quote(cleanTicker), 15000, `Yahoo Finance quote for ${cleanTicker}`) as any;
+    
+    console.log(`[Financial Analyst] Requesting Yahoo Finance quoteSummary modules for ${cleanTicker}`);
+    const summary = await withTimeout(yf.quoteSummary(cleanTicker, {
       modules: ['summaryProfile', 'financialData', 'defaultKeyStatistics']
-    });
+    }), 15000, `Yahoo Finance quoteSummary for ${cleanTicker}`) as any;
 
     const marketCap = quote.marketCap || 0;
     const peRatio = quote.trailingPE || quote.forwardPE || 0;
@@ -64,7 +85,6 @@ export async function getFinancials(ticker: string, useMock: boolean = false): P
       revenueGrowth: { label: 'Revenue Growth (YoY)', value: `${revenueGrowth.toFixed(2)}%`, type: 'percent' as const, trend: 'neutral' as const }
     };
 
-    // Calculate historical numbers using simple offsets or default to mock values if unavailable
     const currentYear = new Date().getFullYear();
     const historical = [
       { year: (currentYear - 3).toString(), revenue: revenue * 0.8, netIncome: netIncome * 0.75, operatingMargin: operatingMargin * 0.9 },
@@ -73,14 +93,16 @@ export async function getFinancials(ticker: string, useMock: boolean = false): P
       { year: currentYear.toString(), revenue, netIncome, operatingMargin }
     ];
 
+    console.log(`[Financial Analyst] Completed yfinance retrieval for ${cleanTicker}`);
     return {
       metrics,
       formattedMetrics,
       historical
     };
-  } catch (error) {
-    console.warn(`Failed to fetch live financials for ${cleanTicker}:`, error);
-    // Graceful fallback to AAPL mock if requested ticker is not in database
+  } catch (error: any) {
+    console.warn(`[Financial Analyst] Failed to fetch live financials for ${cleanTicker}:`, error.message);
+    // Graceful fallback to mock data
+    console.log(`[Financial Analyst] Falling back to Mock data for ${cleanTicker}`);
     const fallbackTicker = MOCK_DATABASE[cleanTicker] ? cleanTicker : 'AAPL';
     return MOCK_DATABASE[fallbackTicker].financials;
   }
@@ -89,16 +111,18 @@ export async function getFinancials(ticker: string, useMock: boolean = false): P
 export async function getCompanyProfile(ticker: string, useMock: boolean = false): Promise<any> {
   const cleanTicker = ticker.toUpperCase().trim();
 
-  if (useMock || MOCK_DATABASE[cleanTicker]) {
-    if (MOCK_DATABASE[cleanTicker]) {
-      return MOCK_DATABASE[cleanTicker].intel;
-    }
+  if (useMock || !process.env.GEMINI_API_KEY && !process.env.OPENAI_API_KEY) {
+    console.log(`[Company Intel] Running in Mock/Sandbox mode for ${cleanTicker}`);
+    const fallbackTicker = MOCK_DATABASE[cleanTicker] ? cleanTicker : 'AAPL';
+    return MOCK_DATABASE[fallbackTicker].intel;
   }
 
   try {
-    const summary = await yf.quoteSummary(cleanTicker, { modules: ['summaryProfile'] });
+    console.log(`[Company Intel] Requesting corporate profile from Yahoo Finance for ${cleanTicker}`);
+    const summary = await withTimeout(yf.quoteSummary(cleanTicker, { modules: ['summaryProfile'] }), 15000, `Yahoo Finance summaryProfile for ${cleanTicker}`) as any;
     const profile = summary.summaryProfile || {};
 
+    console.log(`[Company Intel] Completed yfinance profile retrieval for ${cleanTicker}`);
     return {
       name: profile.longName || cleanTicker,
       ticker: cleanTicker,
@@ -113,8 +137,10 @@ export async function getCompanyProfile(ticker: string, useMock: boolean = false
       website: profile.website || '',
       summary: profile.longBusinessSummary || ''
     };
-  } catch (error) {
-    console.warn(`Failed to fetch company profile for ${cleanTicker}:`, error);
+  } catch (error: any) {
+    console.warn(`[Company Intel] Failed to fetch company profile for ${cleanTicker}:`, error.message);
+    // Graceful fallback to mock data
+    console.log(`[Company Intel] Falling back to Mock data for ${cleanTicker}`);
     const fallbackTicker = MOCK_DATABASE[cleanTicker] ? cleanTicker : 'AAPL';
     return MOCK_DATABASE[fallbackTicker].intel;
   }

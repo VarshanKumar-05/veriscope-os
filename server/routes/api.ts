@@ -30,25 +30,40 @@ interface ActiveSession {
 }
 const activeSessions = new Map<string, ActiveSession>();
 
+let memoryHistory: Record<string, ActiveSession> = {};
+let useMemoryStorage = false;
+
 // Helper to read history from local file
 function readHistory(): Record<string, ActiveSession> {
+  if (useMemoryStorage) {
+    return memoryHistory;
+  }
   try {
     if (fs.existsSync(HISTORY_FILE)) {
       const data = fs.readFileSync(HISTORY_FILE, 'utf8');
-      return JSON.parse(data);
+      const parsed = JSON.parse(data);
+      // Synchronize in-memory log so it stays updated
+      memoryHistory = parsed;
+      return parsed;
     }
   } catch (error) {
-    console.error('Failed to read history file:', error);
+    console.error('Failed to read history file, switching to memory storage:', error);
+    useMemoryStorage = true;
   }
-  return {};
+  return memoryHistory;
 }
 
 // Helper to write history to local file
 function writeHistory(history: Record<string, ActiveSession>) {
+  memoryHistory = history;
+  if (useMemoryStorage) {
+    return;
+  }
   try {
     fs.writeFileSync(HISTORY_FILE, JSON.stringify(history, null, 2), 'utf8');
   } catch (error) {
-    console.error('Failed to write history file:', error);
+    console.error('Failed to write history file, switching to memory storage:', error);
+    useMemoryStorage = true;
   }
 }
 
@@ -188,12 +203,21 @@ router.get('/research/stream', (req: Request, res: Response) => {
     'Connection': 'keep-alive',
     'X-Accel-Buffering': 'no' // Prevent proxy buffering
   });
+  
+  // Flush headers to establish the SSE channel immediately
+  res.flushHeaders();
 
   // Client connection close handler
   req.on('close', () => {
     console.log(`SSE connection closed for session: ${id}`);
     res.end();
   });
+
+  // Write immediate initial event so client knows connection succeeded
+  res.write(`data: ${JSON.stringify({ state: session.state })}\n\n`);
+  if (typeof (res as any).flush === 'function') {
+    (res as any).flush();
+  }
 
   // Start graph execution with a callback that writes to the stream
   const graph = new ResearchGraph(
@@ -205,6 +229,9 @@ router.get('/research/stream', (req: Request, res: Response) => {
 
       // Write SSE event
       res.write(`data: ${JSON.stringify(update)}\n\n`);
+      if (typeof (res as any).flush === 'function') {
+        (res as any).flush();
+      }
     },
     forceMock === 'true'
   );
@@ -224,6 +251,9 @@ router.get('/research/stream', (req: Request, res: Response) => {
       // Remove from active map and close response
       activeSessions.delete(id);
       res.write('event: complete\ndata: {}\n\n');
+      if (typeof (res as any).flush === 'function') {
+        (res as any).flush();
+      }
       res.end();
     })
     .catch((error) => {
@@ -241,6 +271,9 @@ router.get('/research/stream', (req: Request, res: Response) => {
 
       activeSessions.delete(id);
       res.write(`event: error\ndata: ${JSON.stringify({ message: error.message })}\n\n`);
+      if (typeof (res as any).flush === 'function') {
+        (res as any).flush();
+      }
       res.end();
     });
 });

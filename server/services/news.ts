@@ -1,24 +1,45 @@
 import { MOCK_DATABASE } from './mockData.js';
 import { NewsData } from '../../shared/types.js';
 
+// Helper to fetch with timeout using AbortController
+async function fetchWithTimeout(url: string, options: any = {}, timeoutMs: number = 15000) {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      ...options,
+      signal: controller.signal
+    });
+    clearTimeout(timeoutId);
+    return response;
+  } catch (error: any) {
+    clearTimeout(timeoutId);
+    if (error.name === 'AbortError' || error.message?.includes('aborted')) {
+      throw new Error(`News API request timed out after ${timeoutMs / 1000} seconds`);
+    }
+    throw error;
+  }
+}
+
 export async function getNews(ticker: string, useMock: boolean = false): Promise<NewsData> {
   const cleanTicker = ticker.toUpperCase().trim();
 
-  // If mock mode is forced, or if it is one of our pre-configured sandbox tickers and we are running offline/demo, return mock
-  if (useMock || MOCK_DATABASE[cleanTicker]) {
-    if (MOCK_DATABASE[cleanTicker]) {
-      return MOCK_DATABASE[cleanTicker].news;
-    }
+  // If mock mode is forced or no live keys exist, return mock immediately
+  if (useMock || !process.env.NEWS_API_KEY && !process.env.TAVILY_API_KEY) {
+    console.log(`[News Analyst] Running in Mock/Sandbox mode for ${cleanTicker}`);
+    const fallbackTicker = MOCK_DATABASE[cleanTicker] ? cleanTicker : 'AAPL';
+    return MOCK_DATABASE[fallbackTicker].news;
   }
 
-  // Live Mode: Check for NewsAPI or Tavily Search API key
   const newsApiKey = process.env.NEWS_API_KEY;
   const tavilyApiKey = process.env.TAVILY_API_KEY;
 
   if (newsApiKey) {
     try {
+      console.log(`[News Analyst] Requesting NewsAPI for ${cleanTicker}`);
       const url = `https://newsapi.org/v2/everything?q=${encodeURIComponent(cleanTicker + ' stock')}&sortBy=publishedAt&pageSize=6&apiKey=${newsApiKey}`;
-      const response = await fetch(url);
+      const response = await fetchWithTimeout(url, {}, 15000); // 15 seconds timeout
+      
       if (response.ok) {
         const data = await response.json() as any;
         if (data.articles && data.articles.length > 0) {
@@ -27,7 +48,6 @@ export async function getNews(ticker: string, useMock: boolean = false): Promise
           let negCount = 0;
 
           const articles = data.articles.map((art: any, index: number) => {
-            // Basic heuristic sentiment analyzer (live fallback)
             const text = (art.title + ' ' + art.description).toLowerCase();
             let sentiment: 'positive' | 'neutral' | 'negative' = 'neutral';
             if (text.includes('beat') || text.includes('surge') || text.includes('growth') || text.includes('buy') || text.includes('raise') || text.includes('expand')) {
@@ -53,6 +73,7 @@ export async function getNews(ticker: string, useMock: boolean = false): Promise
           });
 
           const total = articles.length;
+          console.log(`[News Analyst] NewsAPI completed: Parsed ${total} articles`);
           return {
             articles,
             sentimentSummary: {
@@ -62,13 +83,18 @@ export async function getNews(ticker: string, useMock: boolean = false): Promise
             }
           };
         }
+      } else {
+        console.warn(`[News Analyst] NewsAPI returned status ${response.status}`);
       }
-    } catch (error) {
-      console.warn(`Failed to fetch news from NewsAPI for ${cleanTicker}:`, error);
+    } catch (error: any) {
+      console.warn(`[News Analyst] Failed to fetch news from NewsAPI for ${cleanTicker}:`, error.message);
     }
-  } else if (tavilyApiKey) {
+  }
+
+  if (tavilyApiKey) {
     try {
-      const response = await fetch('https://api.tavily.com/search', {
+      console.log(`[News Analyst] Requesting Tavily API search for ${cleanTicker}`);
+      const response = await fetchWithTimeout('https://api.tavily.com/search', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -78,7 +104,7 @@ export async function getNews(ticker: string, useMock: boolean = false): Promise
           include_answer: false,
           max_results: 5
         })
-      });
+      }, 15000); // 15 seconds timeout
 
       if (response.ok) {
         const data = await response.json() as any;
@@ -108,6 +134,7 @@ export async function getNews(ticker: string, useMock: boolean = false): Promise
           const neg = articles.filter((a: any) => a.sentiment === 'negative').length;
           const neu = articles.length - pos - neg;
 
+          console.log(`[News Analyst] Tavily search completed: Parsed ${articles.length} results`);
           return {
             articles,
             sentimentSummary: {
@@ -117,13 +144,16 @@ export async function getNews(ticker: string, useMock: boolean = false): Promise
             }
           };
         }
+      } else {
+        console.warn(`[News Analyst] Tavily returned status ${response.status}`);
       }
-    } catch (error) {
-      console.warn(`Failed to fetch news from Tavily for ${cleanTicker}:`, error);
+    } catch (error: any) {
+      console.warn(`[News Analyst] Failed to fetch news from Tavily for ${cleanTicker}:`, error.message);
     }
   }
 
-  // Fallback to mock data for the requested ticker, or AAPL if not in mock database
+  // Fallback to mock database
+  console.log(`[News Analyst] Falling back to Mock data for ${cleanTicker}`);
   const fallbackTicker = MOCK_DATABASE[cleanTicker] ? cleanTicker : 'AAPL';
   return MOCK_DATABASE[fallbackTicker].news;
 }

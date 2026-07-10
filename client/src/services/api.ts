@@ -2,7 +2,7 @@ import type { ResearchState } from '../types/shared.ts';
 
 const API_BASE = import.meta.env.VITE_API_URL
   ? `${import.meta.env.VITE_API_URL}/api`
-  : '/api';
+  : (import.meta.env.DEV ? 'http://localhost:5000/api' : '/api');
 
 export interface HistoryItem {
   id: string;
