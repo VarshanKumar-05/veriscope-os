@@ -81,6 +81,35 @@ router.get('/health', (req: Request, res: Response) => {
   });
 });
 
+// GET /api/market-overview
+router.get('/market-overview', async (req: Request, res: Response) => {
+  try {
+    const symbols = ['^GSPC', '^IXIC', '^DJI', 'BTC-USD'];
+    const results = [];
+    // Dynamic import to avoid top-level issues if any
+    const yfModule = await import('yahoo-finance2');
+    const yf = new (yfModule.default as any)();
+    
+    for (const symbol of symbols) {
+      try {
+        const quote = await yf.quote(symbol);
+        results.push({
+          ticker: symbol,
+          name: quote.shortName || symbol,
+          price: quote.regularMarketPrice,
+          change: quote.regularMarketChangePercent,
+          rawChange: quote.regularMarketChange
+        });
+      } catch (err) {
+        console.warn(`[Market] Failed to fetch ${symbol}`);
+      }
+    }
+    res.json(results);
+  } catch (err: any) {
+    res.status(500).json({ error: 'Failed to fetch market overview' });
+  }
+});
+
 // GET /api/history
 router.get('/history', (req: Request, res: Response) => {
   const history = readHistory();

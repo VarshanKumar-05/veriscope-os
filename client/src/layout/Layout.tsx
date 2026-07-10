@@ -224,11 +224,9 @@ export default function Layout() {
                       <div className="flex flex-col min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className="font-bold font-mono text-sm tracking-tight">{item.ticker}</span>
-                          {item.exchange && (
-                            <span className="text-[8px] font-bold text-text-secondary font-mono bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded-sm shrink-0">{item.exchange}</span>
-                          )}
+                          {/* We don't have exchange stored in history yet, but we will use companyName */}
                         </div>
-                        <span className="text-[10px] text-text-secondary truncate max-w-[120px] font-medium mt-0.5">{item.name}</span>
+                        <span className="text-[10px] text-text-secondary truncate max-w-[150px] font-medium mt-0.5" title={item.companyName}>{item.companyName}</span>
                       </div>
                       <div className="text-right shrink-0">
                         <div className="font-mono text-xs font-bold text-text-primary">{item.price || '$--.--'}</div>

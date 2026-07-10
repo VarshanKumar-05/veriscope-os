@@ -431,6 +431,7 @@ Here is raw context data retrieved from verified API sources (Yahoo Finance, Fin
 ${JSON.stringify(contextData, null, 2)}
 
 Collect the following corporate identity fields:
+- Official Legal Company Name (e.g., "Apple Inc.", "NVIDIA Corporation", NEVER abbreviate)
 - CEO
 - Founders (array of strings)
 - Founded Year (string)
@@ -458,6 +459,7 @@ Collect the following financial metrics (for the trailing twelve months TTM, in 
 Return your response ONLY as a JSON object matching this TypeScript interface:
 interface VerifiedData {
   company: {
+    officialName: string;
     ceo: string;
     founders: string[];
     founded: string;

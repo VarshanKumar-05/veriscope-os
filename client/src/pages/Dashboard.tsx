@@ -526,7 +526,13 @@ const eventSource = new EventSource(
             {intel.name}
           </h1>
           <div className="text-[10px] font-mono text-slate-450 dark:text-slate-500 font-bold uppercase tracking-wider mt-0.5">
-            {(intel as any).exchange || 'Unknown'}: {reportState.ticker} • Conviction Index: {decision.confidence}%
+            {intel.exchange || 'Unknown'} : {reportState.ticker}
+          </div>
+          <div className="text-[10px] font-mono text-slate-450 dark:text-slate-500 font-bold uppercase tracking-wider mt-0.5">
+            {intel.sector || 'Unknown'} • {intel.country || 'Unknown'}
+          </div>
+          <div className="text-[10px] font-mono text-slate-450 dark:text-slate-500 font-bold uppercase tracking-wider mt-0.5">
+            Conviction Index : {decision.confidence}%
           </div>
         </div>
 

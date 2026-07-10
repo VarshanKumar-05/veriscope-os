@@ -74,3 +74,17 @@ export async function fetchSearch(query: string): Promise<SearchSuggestion[]> {
   if (!res.ok) throw new Error('Failed to fetch autocomplete suggestions');
   return res.json();
 }
+
+export interface MarketOverviewItem {
+  ticker: string;
+  name: string;
+  price: number;
+  change: number;
+  rawChange: number;
+}
+
+export async function fetchMarketOverview(): Promise<MarketOverviewItem[]> {
+  const res = await fetch(`${API_BASE}/market-overview`);
+  if (!res.ok) throw new Error('Failed to fetch market overview');
+  return res.json();
+}

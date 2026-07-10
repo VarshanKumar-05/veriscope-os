@@ -119,7 +119,7 @@ export async function getCompanyProfile(ticker: string, useMock: boolean = false
     const verified = await runDataVerificationAgent(cleanTicker, name, contextData);
 
     const profile = {
-      name,
+      name: verified.company.officialName && verified.company.officialName !== "Verified information unavailable" ? verified.company.officialName : name,
       ticker: cleanTicker,
       exchange: exchange,
       country: finnhubProfile?.country || quote?.country || 'Unknown',
