@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
 
 // Use Tailwind classes to match theme automatically
@@ -126,12 +126,7 @@ export default function FinancialTable({
 }: FinancialTableProps = {}) {
   const indices = initialIndices;
   const [selectedIndex, setSelectedIndex] = useState<string | null>("1");
-  const [mounted, setMounted] = useState(false);
   const shouldReduceMotion = useReducedMotion();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   const handleIndexSelect = (indexId: string) => {
     setSelectedIndex(indexId);
@@ -352,7 +347,7 @@ export default function FinancialTable({
               animate="visible"
               className="divide-y divide-slate-100 dark:divide-slate-800"
             >
-              {indices.map((index, indexNum) => (
+              {indices.map((index) => (
                 <motion.div key={index.id} variants={rowVariants}>
                   <div
                     className={`px-8 py-4 cursor-pointer group relative transition-all duration-200 ${

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Activity, ShieldAlert, BarChart, Clock, Zap } from 'lucide-react';
 
 export default function IntelligenceRibbon() {

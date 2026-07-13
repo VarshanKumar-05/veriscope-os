@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Compass, Activity, ShieldAlert, BarChart, FileText, Settings, Moon, Sun, Zap } from 'lucide-react';
+import { Search, Compass, Activity, ShieldAlert, BarChart, FileText, Moon, Sun, Zap } from 'lucide-react';
 import { useTheme } from '../providers/ThemeProvider';
 
 interface Command {

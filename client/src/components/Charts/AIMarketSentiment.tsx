@@ -1,5 +1,15 @@
-import React from 'react';
-import { Activity, TrendingUp, TrendingDown, Minus } from 'lucide-react';
+import { Activity } from 'lucide-react';
+
+export interface AIMarketSentimentProps {
+  sentimentScore: number; // -100 to 100
+  confidence: number; // 0 to 100
+  shortTermOutlook: 'Bullish' | 'Bearish' | 'Neutral';
+  longTermOutlook: 'Bullish' | 'Bearish' | 'Neutral';
+  keyDrivers: Array<{
+    factor: string;
+    impact: 'positive' | 'negative' | 'neutral';
+  }>;
+}
 
 export default function AIMarketSentiment({ decision }: { decision: any }) {
   // Generate a mock sentiment score based on recommendation
@@ -8,7 +18,6 @@ export default function AIMarketSentiment({ decision }: { decision: any }) {
   const score = isBuy ? Math.floor(Math.random() * 20) + 75 : isPass ? Math.floor(Math.random() * 20) + 30 : Math.floor(Math.random() * 20) + 50;
   
   const sentimentLabel = score >= 70 ? 'Bullish' : score <= 40 ? 'Bearish' : 'Neutral';
-  const Icon = score >= 70 ? TrendingUp : score <= 40 ? TrendingDown : Minus;
   const colorClass = score >= 70 ? 'text-emerald-500' : score <= 40 ? 'text-red-500' : 'text-amber-500';
   const bgClass = score >= 70 ? 'bg-emerald-50 dark:bg-emerald-950/20' : score <= 40 ? 'bg-red-50 dark:bg-red-950/20' : 'bg-amber-50 dark:bg-amber-950/20';
 

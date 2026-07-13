@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Sparkles, Cpu, Award, ChevronRight, BarChart4, BookOpen, Layers, ShieldAlert, Trash2, Bookmark, Compass } from 'lucide-react';
-import { startResearch, fetchHistory, fetchSearch, togglePin, deleteReport, type SearchSuggestion } from '../services/api.js';
+import { Search, Cpu, Award, ChevronRight, BarChart4, BookOpen, Layers, ShieldAlert } from 'lucide-react';
+import { startResearch, fetchHistory, fetchSearch, type SearchSuggestion } from '../services/api.js';
 import FinancialTable from '../components/FinancialTable.js';
 import StockPortfolioCard from '../components/StockPortfolioCard.js';
 import ClickSpark from '../components/ClickSpark.js';
@@ -29,20 +29,6 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
-
-  const pinMutation = useMutation({
-    mutationFn: togglePin,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['history'] });
-    }
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: deleteReport,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['history'] });
-    }
-  });
 
   // Load history list to display recent research
   const { data: history = [] } = useQuery({
@@ -97,6 +83,14 @@ export default function LandingPage() {
   };
 
   return (
+    <ClickSpark
+      sparkColor='#3b82f6'
+      sparkSize={12}
+      sparkRadius={20}
+      sparkCount={12}
+      duration={500}
+      extraScale={1.2}
+    >
     <div className="h-full overflow-y-auto bg-blueprint p-6 md:p-12 flex flex-col items-center gap-12 text-text-primary">
       
       {/* HERO SECTION */}
@@ -324,6 +318,17 @@ export default function LandingPage() {
                           <button
                             onClick={() => handleTickerSelect(item.ticker)}
                             className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-text-secondary hover:text-text-primary transition-all cursor-pointer"
+                          >
+                            <Search size={16} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 

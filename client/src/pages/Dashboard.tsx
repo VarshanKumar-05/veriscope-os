@@ -836,7 +836,7 @@ const eventSource = new EventSource(
               onNodesChange={onNodesChange}
               onEdgesChange={onEdgesChange}
               nodeTypes={nodeTypes}
-              colorMode={theme}
+              colorMode={theme === 'electric' ? 'dark' : theme as 'light' | 'dark' | 'system'}
               defaultEdgeOptions={{ animated: true, type: 'default' }}
               fitView
               fitViewOptions={{ padding: 0.15 }}
