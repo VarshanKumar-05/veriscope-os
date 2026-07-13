@@ -1,6 +1,5 @@
 # Veriscope OS 🔭
 
-![Veriscope OS](docs/screenshot.png) *(Note: Please place your application screenshot in `docs/screenshot.png`)*
 
 ## 1. Project Overview
 
