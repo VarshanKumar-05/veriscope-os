@@ -1,8 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Sparkles, Cpu, Award, ChevronRight, BarChart4, BookOpen, Layers, ShieldAlert, Trash2, Bookmark } from 'lucide-react';
+import { Search, Sparkles, Cpu, Award, ChevronRight, BarChart4, BookOpen, Layers, ShieldAlert, Trash2, Bookmark, Compass } from 'lucide-react';
 import { startResearch, fetchHistory, fetchSearch, togglePin, deleteReport, type SearchSuggestion } from '../services/api.js';
+import FinancialTable from '../components/FinancialTable.js';
+import StockPortfolioCard from '../components/StockPortfolioCard.js';
+import ClickSpark from '../components/ClickSpark.js';
+import SplitText from '../components/SplitText.js';
 
 const POPULAR_TICKERS = [
   { ticker: 'AAPL', name: 'Apple Inc.', industry: 'Consumer Electronics' },
@@ -96,24 +100,41 @@ export default function LandingPage() {
     <div className="h-full overflow-y-auto bg-blueprint p-6 md:p-12 flex flex-col items-center gap-12 text-text-primary">
       
       {/* HERO SECTION */}
-      <div className="w-full max-w-4xl text-center space-y-8 pt-10">
+      <div className="w-full max-w-5xl text-center space-y-12 pt-6">
         
-        {/* Version Badge */}
-        <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-slate-900/5 dark:bg-white/5 border border-border-custom text-xs font-semibold tracking-wide text-text-secondary">
-          <Sparkles size={12} className="text-[var(--primary)]" />
-          <span>Veriscope OS AI Agent Pipeline v1.2</span>
-        </div>
-
         {/* Hero Headings */}
-        <div className="space-y-6">
-          <h1 className="text-[42px] sm:text-[64px] md:text-[82px] font-heading font-extrabold tracking-[-0.04em] leading-[0.95] text-text-primary shadow-none">
-            Research Any Public Company
+        <div className="space-y-4">
+          <h1 className="text-[48px] sm:text-[64px] md:text-[76px] font-heading font-extrabold tracking-tight leading-[1] text-text-primary flex flex-col items-center">
+            <SplitText
+              text="Intelligence,"
+              tag="span"
+              className="inline-block"
+              delay={30}
+              duration={1}
+              from={{ opacity: 0, y: 30 }}
+              to={{ opacity: 1, y: 0 }}
+            />
+            <span className="bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-emerald-500 dark:from-blue-400 dark:to-emerald-400 mt-2 block">
+              <SplitText
+                text="at your command."
+                tag="span"
+                delay={50}
+                duration={1.2}
+                from={{ opacity: 0, y: 30 }}
+                to={{ opacity: 1, y: 0 }}
+              />
+            </span>
           </h1>
-          <div className="text-[22px] font-sans font-medium text-text-secondary leading-relaxed max-w-3xl mx-auto space-y-2">
-            <div>Understand every investment decision with transparent AI reasoning.</div>
-            <div className="text-base font-normal text-slate-400 dark:text-slate-500">
-              Search any listed company to analyze financial health, business risks, news sentiment and competitor landscape.
-            </div>
+          <div className="text-lg md:text-xl font-sans font-medium text-text-secondary leading-relaxed max-w-2xl mx-auto">
+            <SplitText
+              text="Research public companies through evidence-backed AI intelligence."
+              tag="span"
+              splitType="words"
+              delay={20}
+              duration={0.8}
+              from={{ opacity: 0, y: 10 }}
+              to={{ opacity: 1, y: 0 }}
+            />
           </div>
         </div>
 
@@ -196,6 +217,34 @@ export default function LandingPage() {
             </p>
           )}
         </div>
+        
+        {/* GLOBAL MARKET PULSE / FINANCIAL TABLE */}
+        <div className="w-full text-left animate-in fade-in slide-in-from-bottom-4 duration-700 delay-100 fill-mode-both pt-8">
+          <FinancialTable title="Global Indices" />
+        </div>
+
+        {/* MOCK WATCHLIST / PORTFOLIO PREVIEW */}
+        <div className="w-full text-left animate-in fade-in slide-in-from-bottom-4 duration-700 delay-200 fill-mode-both pt-8">
+          <div className="flex items-end justify-between border-b border-border-custom pb-3 mb-6 max-w-7xl mx-auto">
+            <h2 className="text-[32px] font-bold text-text-primary tracking-tight leading-none">Your Portfolio</h2>
+            <span className="text-xs text-text-secondary font-mono mb-1">Live Tracking</span>
+          </div>
+          <StockPortfolioCard 
+            totalGain={12450.75}
+            returnPercentage={18.4}
+            asOfDate={new Date().toLocaleDateString()}
+            holdings={[
+              { ticker: 'NVDA', name: 'NVIDIA Corporation', shares: 145, lastPrice: 875.28, changeValue: 12.45, changePercent: 1.44 },
+              { ticker: 'AAPL', name: 'Apple Inc.', shares: 320, lastPrice: 173.50, changeValue: -2.10, changePercent: -1.20 },
+              { ticker: 'MSFT', name: 'Microsoft Corp.', shares: 85, lastPrice: 420.55, changeValue: 5.30, changePercent: 1.28 }
+            ]}
+            news={[
+              { category: 'AI & Semiconductors', time: '10 mins ago', title: 'NVIDIA announces next-generation Blackwell architecture details', source: 'Reuters' },
+              { category: 'Consumer Tech', time: '1 hr ago', title: 'Apple reportedly in talks with Google for Gemini AI integration on iPhone', source: 'Bloomberg' },
+              { category: 'Cloud Computing', time: '3 hrs ago', title: 'Microsoft expands Azure capacity to meet surging AI enterprise demand', source: 'CNBC' }
+            ]}
+          />
+        </div>
       </div>
 
       {/* RECENT RESEARCH ARCHIVE LIST */}
@@ -275,36 +324,6 @@ export default function LandingPage() {
                           <button
                             onClick={() => handleTickerSelect(item.ticker)}
                             className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-text-secondary hover:text-text-primary transition-all cursor-pointer"
-                            title="Re-run research"
-                          >
-                            <Search size={14} />
-                          </button>
-                          <button
-                            onClick={() => pinMutation.mutate(item.id)}
-                            className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-text-secondary hover:text-text-primary transition-all cursor-pointer"
-                            title={item.pinned ? "Unpin report" : "Pin report"}
-                          >
-                            <Bookmark size={14} className={item.pinned ? "fill-slate-400 dark:fill-slate-500" : ""} />
-                          </button>
-                          <button
-                            onClick={() => {
-                              if (confirm('Delete this report permanently?')) {
-                                deleteMutation.mutate(item.id);
-                              }
-                            }}
-                            className="p-1 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-text-secondary hover:text-[var(--danger)] transition-all cursor-pointer"
-                            title="Delete report"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
         </div>
       )}
 
@@ -399,5 +418,6 @@ export default function LandingPage() {
       </div>
 
     </div>
+    </ClickSpark>
   );
 }

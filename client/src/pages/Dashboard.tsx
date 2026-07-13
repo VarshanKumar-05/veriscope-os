@@ -49,6 +49,9 @@ import html2canvas from 'html2canvas';
 import { fetchReport, togglePin } from '../services/api.js';
 import LoadingScreen from '../components/LoadingScreen.tsx';
 import { useTheme } from '../providers/ThemeProvider.tsx';
+import IntelligenceRadar from '../components/Charts/IntelligenceRadar.js';
+import AIMarketSentiment from '../components/Charts/AIMarketSentiment.js';
+import LineSidebar from '../components/LineSidebar.js';
 import { 
   EvidenceNode, 
   FinancialNode, 
@@ -624,172 +627,201 @@ const eventSource = new EventSource(
             <div className="max-w-6xl mx-auto flex gap-8 items-start select-text">
               
               {/* Sticky Sidebar Navigation Index */}
-              <nav className="w-48 shrink-0 sticky top-0 hidden lg:flex flex-col gap-2 p-1.5 border-r border-[#E7E5E4] dark:border-[#273449] text-xs font-semibold no-print">
-                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2 px-2">Report Sections</span>
-                <a href="#conviction" className="px-3 py-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">1. Conviction Index</a>
-                <a href="#drivers" className="px-3 py-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">2. Driving Factors</a>
-                <a href="#red-flags" className="px-3 py-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">3. Red Flags & Risks</a>
-                <a href="#profile" className="px-3 py-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">4. Corporate Identity</a>
-                <a href="#data-quality" className="px-3 py-2 rounded-lg text-text-secondary hover:text-text-primary hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">5. Verification Log</a>
-              </nav>
+              <div className="w-56 shrink-0 sticky top-4 hidden lg:block no-print pt-6">
+                <span className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-4 px-2 block">Report Sections</span>
+                <LineSidebar
+                  items={['Conviction Index', 'Driving Factors', 'Red Flags & Risks', 'Corporate Identity', 'Verification Log']}
+                  accentColor="#3b82f6"
+                  textColor="#94a3b8"
+                  markerColor="#475569"
+                  showIndex={true}
+                  showMarker={true}
+                  proximityRadius={100}
+                  maxShift={20}
+                  falloff="smooth"
+                  markerLength={30}
+                  markerGap={10}
+                  tickScale={0.5}
+                  scaleTick={true}
+                  itemGap={20}
+                  fontSize={0.8}
+                  smoothing={100}
+                  defaultActive={0}
+                  onItemClick={(index) => {
+                    const ids = ['conviction', 'drivers', 'red-flags', 'profile', 'data-quality'];
+                    const element = document.getElementById(ids[index]);
+                    if (element) {
+                      element.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }
+                  }}
+                />
+              </div>
 
-              {/* Main Report Content */}
-              <div className="flex-1 space-y-8 page-transition max-w-4xl">
+              {/* Main Report Content - Bento Grid */}
+              <div className="flex-1 page-transition w-full max-w-5xl">
                 
-                {/* Executive Conviction Header Card */}
-                <div id="conviction" className="p-6 md:p-8 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-6">
-                <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-100 dark:border-slate-800 pb-5 gap-4">
-                  <div className="space-y-1">
-                    <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
-                      AI Investment Recommendation Summary
+                {/* BENTO GRID LAYOUT */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                  {/* Top Row: Executive Conviction Header Card (Span full width) */}
+                  <div id="conviction" className="md:col-span-3 p-6 md:p-8 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-6">
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-100 dark:border-slate-800 pb-5 gap-4">
+                      <div className="space-y-1">
+                        <div className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">
+                          AI Investment Recommendation Summary
+                        </div>
+                        <h2 className="text-3xl font-serif font-black text-slate-900 dark:text-white leading-tight">
+                          {intel.name}
+                        </h2>
+                        <div className="text-[10px] font-semibold font-mono text-slate-455 dark:text-slate-500">
+                          {(intel as any).exchange || 'Unknown'}: {reportState.ticker} • TTM Report
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <span className="px-4 py-2 rounded-lg bg-emerald-600 dark:bg-emerald-700 text-white font-serif font-extrabold text-xs uppercase tracking-widest shadow-xs">
+                          {decision.recommendation}
+                        </span>
+                      </div>
                     </div>
-                    <h2 className="text-3xl font-serif font-black text-slate-900 dark:text-white leading-tight">
-                      {intel.name}
-                    </h2>
-                    <div className="text-[10px] font-semibold font-mono text-slate-455 dark:text-slate-500">
-                      {(intel as any).exchange || 'Unknown'}: {reportState.ticker} • TTM Report
+
+                    {/* Score Index Metrics Row */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="p-4 rounded-xl bg-slate-50/50 dark:bg-slate-900/60 border border-[#E7E5E4] dark:border-slate-800 space-y-1 hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
+                        <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Confidence Score</span>
+                        <div className="text-xl font-bold font-mono text-slate-900 dark:text-white">{decision.confidence}%</div>
+                      </div>
+                      <div className="p-4 rounded-xl bg-slate-50/50 dark:bg-slate-900/60 border border-[#E7E5E4] dark:border-slate-800 space-y-1 hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
+                        <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Company Health</span>
+                        <div className="text-xl font-bold font-mono text-slate-900 dark:text-white">{100 - risks.overallScore}/100</div>
+                      </div>
+                      <div className="p-4 rounded-xl bg-slate-50/50 dark:bg-slate-900/60 border border-[#E7E5E4] dark:border-slate-800 space-y-1 hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
+                        <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Business Risk Index</span>
+                        <div className="text-xl font-bold font-mono text-slate-900 dark:text-white">{risks.overallScore}/100</div>
+                      </div>
+                      <div className="p-4 rounded-xl bg-slate-50/50 dark:bg-slate-900/60 border border-[#E7E5E4] dark:border-slate-800 space-y-1 hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
+                        <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Growth Outlook</span>
+                        <div className="text-xl font-bold font-mono text-slate-900 dark:text-white">{decision.recommendation.includes('Buy') ? 'Positive' : decision.recommendation.includes('Pass') ? 'Negative' : 'Neutral'}</div>
+                      </div>
+                    </div>
+
+                    {/* One-minute AI Summary */}
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">One-Minute Conviction Summary</h4>
+                      <blockquote className="p-4 rounded-xl bg-slate-50 dark:bg-[#0c1322] border border-[#E7E5E4] dark:border-slate-800 text-xs italic text-slate-655 dark:text-slate-400 leading-relaxed">
+                        "{decision.futureOutlook}"
+                      </blockquote>
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-3">
-                    <span className="px-4 py-2 rounded-lg bg-emerald-600 dark:bg-emerald-700 text-white font-serif font-extrabold text-xs uppercase tracking-widest shadow-xs">
-                      {decision.recommendation}
-                    </span>
-                  </div>
-                </div>
 
-                {/* Score Index Metrics Row */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="p-4 rounded-xl bg-slate-50/50 dark:bg-slate-900/60 border border-[#E7E5E4] dark:border-slate-800 space-y-1">
-                    <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Confidence Score</span>
-                    <div className="text-xl font-bold font-mono text-slate-900 dark:text-white">{decision.confidence}%</div>
+                  {/* Middle Row Left: Intelligence Radar */}
+                  <div className="md:col-span-1">
+                    <IntelligenceRadar data={intel} />
                   </div>
-                  <div className="p-4 rounded-xl bg-slate-50/50 dark:bg-slate-900/60 border border-[#E7E5E4] dark:border-slate-800 space-y-1">
-                    <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Company Health</span>
-                    <div className="text-xl font-bold font-mono text-slate-900 dark:text-white">{100 - risks.overallScore}/100</div>
-                  </div>
-                  <div className="p-4 rounded-xl bg-slate-50/50 dark:bg-slate-900/60 border border-[#E7E5E4] dark:border-slate-800 space-y-1">
-                    <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Business Risk Index</span>
-                    <div className="text-xl font-bold font-mono text-slate-900 dark:text-white">{risks.overallScore}/100</div>
-                  </div>
-                  <div className="p-4 rounded-xl bg-slate-50/50 dark:bg-slate-900/60 border border-[#E7E5E4] dark:border-slate-800 space-y-1">
-                    <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Growth Outlook</span>
-                    <div className="text-xl font-bold font-mono text-slate-900 dark:text-white">{decision.recommendation.includes('Buy') ? 'Positive' : decision.recommendation.includes('Pass') ? 'Negative' : 'Neutral'}</div>
-                  </div>
-                </div>
 
-                {/* One-minute AI Summary */}
-                <div className="space-y-2">
-                  <h4 className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">One-Minute Conviction Summary</h4>
-                  <blockquote className="p-4 rounded-xl bg-slate-50 dark:bg-[#0c1322] border border-[#E7E5E4] dark:border-slate-800 text-xs italic text-slate-655 dark:text-slate-400 leading-relaxed">
-                    "{decision.futureOutlook}"
-                  </blockquote>
-                </div>
-              </div>
+                  {/* Middle Row Center: Market Sentiment */}
+                  <div className="md:col-span-1">
+                    <AIMarketSentiment decision={decision} />
+                  </div>
 
-              {/* Reasons & Risks Audit Lists */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                
-                {/* Key Strengths */}
-                <div id="drivers" className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-4">
-                  <h3 className="font-serif font-bold text-md border-b border-slate-100 dark:border-slate-800 pb-2.5 text-slate-900 dark:text-white flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-600" />
-                    <span>Primary Driving Factors</span>
-                  </h3>
-                  <ul className="space-y-3 text-xs text-slate-655 dark:text-slate-400">
-                    {decision.keyStrengths?.map((reason: string, idx: number) => (
-                      <li key={idx} className="flex gap-2 leading-relaxed">
-                        <span className="font-mono text-emerald-600 font-bold">✓</span>
-                        <span>{reason}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                  {/* Middle Row Right: Key Drivers & Risks (stacked) */}
+                  <div className="md:col-span-1 flex flex-col gap-6">
+                    {/* Key Strengths */}
+                    <div id="drivers" className="flex-1 p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-3 overflow-hidden">
+                      <h3 className="font-serif font-bold text-sm border-b border-slate-100 dark:border-slate-800 pb-2 text-slate-900 dark:text-white flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                        <span>Primary Drivers</span>
+                      </h3>
+                      <ul className="space-y-2 text-xs text-slate-655 dark:text-slate-400">
+                        {decision.keyStrengths?.slice(0, 3).map((reason: string, idx: number) => (
+                          <li key={idx} className="flex gap-2 leading-snug line-clamp-2" title={reason}>
+                            <span className="font-mono text-emerald-500 font-bold mt-0.5">✓</span>
+                            <span>{reason}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
 
-                {/* Key Threat Vectors */}
-                <div id="red-flags" className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-4">
-                  <h3 className="font-serif font-bold text-md border-b border-slate-100 dark:border-slate-800 pb-2.5 text-slate-900 dark:text-white flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-red-600" />
-                    <span>Identified Risk Headwinds</span>
-                  </h3>
-                  <ul className="space-y-3 text-xs text-slate-655 dark:text-slate-400">
-                    {decision.keyRisks?.map((riskStr: string, idx: number) => (
-                      <li key={idx} className="flex gap-2 leading-relaxed">
-                        <span className="font-mono text-red-500 font-bold">⚠</span>
-                        <span>{riskStr}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                    {/* Key Threat Vectors */}
+                    <div id="red-flags" className="flex-1 p-5 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-3 overflow-hidden">
+                      <h3 className="font-serif font-bold text-sm border-b border-slate-100 dark:border-slate-800 pb-2 text-slate-900 dark:text-white flex items-center gap-2">
+                        <span className="w-2 h-2 rounded-full bg-red-500" />
+                        <span>Risk Headwinds</span>
+                      </h3>
+                      <ul className="space-y-2 text-xs text-slate-655 dark:text-slate-400">
+                        {decision.keyRisks?.slice(0, 3).map((riskStr: string, idx: number) => (
+                          <li key={idx} className="flex gap-2 leading-snug line-clamp-2" title={riskStr}>
+                            <span className="font-mono text-red-500 font-bold mt-0.5">⚠</span>
+                            <span>{riskStr}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
 
-              </div>
+                  {/* Bottom Row: Corporate Identity & Data Quality */}
+                  <div id="profile" className="md:col-span-2 p-6 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-4">
+                    <h3 className="font-serif font-bold text-md border-b border-slate-100 dark:border-slate-800 pb-2.5 text-slate-900 dark:text-white">Corporate Identity Profile</h3>
+                    <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-xs">
+                      <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
+                        <span className="text-slate-455">Chief Executive Officer</span>
+                        <span className="font-semibold text-slate-900 dark:text-white truncate max-w-[150px]">{intel.ceo}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
+                        <span className="text-slate-455">Founders</span>
+                        <span className="font-semibold text-slate-900 dark:text-white truncate max-w-[150px]">{intel.founders.join(', ')}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
+                        <span className="text-slate-455">Founded Year</span>
+                        <span className="font-semibold text-slate-900 dark:text-white">{intel.founded}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
+                        <span className="text-slate-455">Workforce</span>
+                        <span className="font-semibold text-slate-900 dark:text-white">{typeof intel.employeeCount === 'number' ? `${intel.employeeCount.toLocaleString()} emp` : intel.employeeCount}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
+                        <span className="text-slate-455">Country</span>
+                        <span className="font-semibold text-slate-900 dark:text-white">{(intel as any).country || 'Unknown'}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
+                        <span className="text-slate-455">Currency</span>
+                        <span className="font-semibold text-slate-900 dark:text-white uppercase">{(intel as any).currency || 'USD'}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
+                        <span className="text-slate-455">Sector</span>
+                        <span className="font-semibold text-slate-900 dark:text-white truncate max-w-[150px]">{(intel as any).sector || 'Unknown'}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
+                        <span className="text-slate-455">Industry</span>
+                        <span className="font-semibold text-slate-900 dark:text-white truncate max-w-[150px]">{intel.industry || 'Unknown'}</span>
+                      </div>
+                    </div>
+                  </div>
 
-              {/* Corporate Identity Profile */}
-              <div id="profile" className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-4">
-                <h3 className="font-serif font-bold text-md border-b border-slate-100 dark:border-slate-800 pb-2.5 text-slate-900 dark:text-white">Corporate Identity Profile</h3>
-                <div className="space-y-3 text-xs">
-                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
-                    <span className="text-slate-455">Chief Executive Officer</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">{intel.ceo}</span>
+                  {/* Data Verification & Quality Credentials */}
+                  <div id="data-quality" className="md:col-span-1 p-6 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-4">
+                    <h3 className="font-serif font-bold text-md border-b border-slate-100 dark:border-slate-800 pb-2.5 text-slate-900 dark:text-white">Data Quality</h3>
+                    <div className="space-y-3 text-xs">
+                      <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
+                        <span className="text-slate-455">Verification Status</span>
+                        <span className="font-semibold text-emerald-600 dark:text-emerald-500">{(intel as any).verificationStatus || 'Verified'}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
+                        <span className="text-slate-455">Data Freshness</span>
+                        <span className="font-semibold text-slate-900 dark:text-white">{(intel as any).dataFreshness || 'TTM'}</span>
+                      </div>
+                      <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
+                        <span className="text-slate-455">Confidence Score</span>
+                        <span className="font-semibold text-slate-900 dark:text-white">{(intel as any).confidenceScore || 95}%</span>
+                      </div>
+                      <div className="flex flex-col gap-1 py-1 border-b border-slate-50 dark:border-slate-950">
+                        <span className="text-slate-455">Verified Sources</span>
+                        <span className="font-semibold text-slate-900 dark:text-white truncate text-right">{((intel as any).verifiedSources || ['Yahoo Finance', 'SEC']).join(', ')}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
-                    <span className="text-slate-455">Founders</span>
-                    <span className="font-semibold text-slate-900 dark:text-white text-right">{intel.founders.join(', ')}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
-                    <span className="text-slate-455">Founded Year</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">{intel.founded}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
-                    <span className="text-slate-455">Workforce</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">{typeof intel.employeeCount === 'number' ? `${intel.employeeCount.toLocaleString()} employees` : intel.employeeCount}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
-                    <span className="text-slate-455">Country</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">{(intel as any).country || 'Unknown'}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
-                    <span className="text-slate-455">Currency</span>
-                    <span className="font-semibold text-slate-900 dark:text-white uppercase">{(intel as any).currency || 'USD'}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
-                    <span className="text-slate-455">Sector</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">{(intel as any).sector || 'Unknown'}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
-                    <span className="text-slate-455">Industry</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">{intel.industry || 'Unknown'}</span>
-                  </div>
-                </div>
-              </div>
 
-              {/* Data Verification & Quality Credentials */}
-              <div id="data-quality" className="p-6 rounded-2xl bg-white dark:bg-[#111827] border border-[#E7E5E4] dark:border-[#273449] shadow-xs space-y-4">
-                <h3 className="font-serif font-bold text-md border-b border-slate-100 dark:border-slate-800 pb-2.5 text-slate-900 dark:text-white">Data Verification & Quality Credentials</h3>
-                <div className="space-y-3 text-xs">
-                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
-                    <span className="text-slate-455">Verification Status</span>
-                    <span className="font-semibold text-emerald-600 dark:text-emerald-500">{(intel as any).verificationStatus || 'Verified'}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
-                    <span className="text-slate-455">Data Freshness</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">{(intel as any).dataFreshness || 'TTM'}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
-                    <span className="text-slate-455">Confidence Score</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">{(intel as any).confidenceScore || 95}%</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
-                    <span className="text-slate-455">Verified Sources</span>
-                    <span className="font-semibold text-slate-900 dark:text-white text-right">{((intel as any).verifiedSources || ['Yahoo Finance', 'SEC Filings']).join(', ')}</span>
-                  </div>
-                  <div className="flex justify-between py-1 border-b border-slate-50 dark:border-slate-950">
-                    <span className="text-slate-455">Last Verified</span>
-                    <span className="font-semibold text-slate-900 dark:text-white">{(intel as any).lastUpdated || new Date().toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
-
+                </div> {/* Close Bento Grid */}
               </div> {/* Close Main Report Content */}
             </div> {/* Close max-w-6xl flex wrapper */}
           </div>
@@ -1382,6 +1414,15 @@ const eventSource = new EventSource(
               <div className="p-4 bg-slate-900/40 rounded-xl border border-slate-800 text-center">
                 <span className="text-[9px] font-bold text-slate-500 uppercase tracking-wider block">Threat Index</span>
                 <span className="text-xl font-bold font-mono text-red-400">{risks.overallScore}/100</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-6 mt-8">
+              <div className="h-[250px] bg-slate-900/20 rounded-xl overflow-hidden border border-slate-800/50 p-2">
+                <IntelligenceRadar data={intel} />
+              </div>
+              <div className="h-[250px] bg-slate-900/20 rounded-xl overflow-hidden border border-slate-800/50 p-2">
+                <AIMarketSentiment decision={decision} />
               </div>
             </div>
           </div>

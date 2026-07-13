@@ -49,6 +49,29 @@
   --scrollbar-track: transparent;
 }
 
+.electric {
+  --background: #000000;
+  --surface: #0a0a0a;
+  --elevated-surface: #121212;
+  --text-primary: #FFFFFF;
+  --text-secondary: #00E5FF; /* Cyan glow text */
+  --border: #00E5FF;
+  --divider: #1E293B;
+  --primary: #00E5FF;
+  --secondary: #00E5FF;
+  --accent: #FF00FF; /* Magenta accent */
+  --success: #39FF14; /* Neon green */
+  --warning: #FFE300;
+  --danger: #FF003C;
+  --hover: rgba(0, 229, 255, 0.15);
+  --selection: rgba(255, 0, 255, 0.25);
+  --disabled: #1a1a1a;
+  --shadow: 0 0 10px rgba(0, 229, 255, 0.2), 0 0 5px rgba(255, 0, 255, 0.1);
+  --shadow-hover: 0 0 20px rgba(0, 229, 255, 0.4), 0 0 10px rgba(255, 0, 255, 0.3);
+  --scrollbar-thumb: rgba(0, 229, 255, 0.3);
+  --scrollbar-track: transparent;
+}
+
 @theme {
   --color-background: var(--background);
   --color-surface: var(--surface);
@@ -137,6 +160,22 @@
     linear-gradient(to bottom, rgba(249, 250, 251, 0.05) 1px, transparent 1px);
   background-size: 20px 20px;
   transition: background-color 0.2s ease;
+}
+
+@keyframes electricPulse {
+  0% { opacity: 0.8; box-shadow: inset 0 0 50px rgba(0, 229, 255, 0.1); }
+  50% { opacity: 1; box-shadow: inset 0 0 100px rgba(0, 229, 255, 0.3), inset 0 0 50px rgba(255, 0, 255, 0.1); }
+  100% { opacity: 0.8; box-shadow: inset 0 0 50px rgba(0, 229, 255, 0.1); }
+}
+
+.bg-blueprint-electric {
+  background-color: var(--background);
+  background-image: 
+    linear-gradient(to right, rgba(0, 229, 255, 0.15) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 229, 255, 0.15) 1px, transparent 1px);
+  background-size: 20px 20px;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  animation: electricPulse 4s infinite alternate ease-in-out;
 }
 
 /* React Flow custom styling adjustments */
@@ -234,6 +273,12 @@
   }
   to {
     stroke-dashoffset: 0;
+  }
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
   }
 }
 

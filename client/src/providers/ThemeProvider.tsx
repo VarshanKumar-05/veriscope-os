@@ -1,10 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
-type Theme = 'light' | 'dark';
+type Theme = 'light' | 'dark' | 'electric';
 
 interface ThemeContextType {
   theme: Theme;
   toggleTheme: () => void;
+  setThemeMode: (mode: Theme) => void;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -27,24 +28,29 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   useEffect(() => {
     const root = document.documentElement;
+    root.classList.remove('dark', 'electric');
+    document.body.classList.remove('bg-blueprint', 'bg-blueprint-dark', 'bg-blueprint-electric');
+
     if (theme === 'dark') {
       root.classList.add('dark');
       document.body.classList.add('bg-blueprint-dark');
-      document.body.classList.remove('bg-blueprint');
+    } else if (theme === 'electric') {
+      root.classList.add('electric', 'dark'); // Electric is fundamentally dark
+      document.body.classList.add('bg-blueprint-electric');
     } else {
-      root.classList.remove('dark');
-      document.body.classList.remove('bg-blueprint-dark');
       document.body.classList.add('bg-blueprint');
     }
     localStorage.setItem('theme', theme);
   }, [theme]);
 
   const toggleTheme = () => {
-    setTheme((prev) => (prev === 'light' ? 'dark' : 'light'));
+    setTheme((prev) => (prev === 'light' ? 'dark' : prev === 'dark' ? 'electric' : 'light'));
   };
 
+  const setThemeMode = (mode: Theme) => setTheme(mode);
+
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, setThemeMode }}>
       {children}
     </ThemeContext.Provider>
   );

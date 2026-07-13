@@ -7,7 +7,8 @@ import {
   Menu, 
   X, 
   Sun, 
-  Moon, 
+  Moon,
+  Zap,
   Bookmark, 
   History, 
   Download, 
@@ -20,6 +21,8 @@ import {
 } from 'lucide-react';
 import { fetchHistory, togglePin, deleteReport, getExportUrl, fetchSearch, type SearchSuggestion } from '../services/api.js';
 import { useTheme } from '../providers/ThemeProvider';
+import IntelligenceRibbon from '../components/IntelligenceRibbon.js';
+import CommandPalette from '../components/CommandPalette.js';
 
 export default function Layout() {
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -28,9 +31,9 @@ export default function Layout() {
   const [searchSuggestions, setSearchSuggestions] = useState<SearchSuggestion[]>([]);
   const [showSettingsModal, setShowSettingsModal] = useState(false);
   const [showProfileCard, setShowProfileCard] = useState(false);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
   
   const { theme, toggleTheme } = useTheme();
-  const darkTheme = theme === 'dark';
   
   const navigate = useNavigate();
   const { id } = useParams();
@@ -94,8 +97,7 @@ export default function Layout() {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (((e.metaKey || e.ctrlKey) && e.key === 'k') || (e.altKey && e.key.toLowerCase() === 's')) {
         e.preventDefault();
-        const searchInput = document.getElementById('global-search') || document.querySelector('input[type="text"]');
-        if (searchInput) (searchInput as HTMLInputElement).focus();
+        setShowCommandPalette(prev => !prev);
       }
       if (e.altKey && e.key.toLowerCase() === 't') {
         e.preventDefault();
@@ -108,7 +110,7 @@ export default function Layout() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [darkTheme, navigate]);
+  }, [theme, navigate]);
   // Theme is now managed by ThemeProvider
   useEffect(() => {
     if (searchQuery.trim().length < 2) {
@@ -147,7 +149,7 @@ export default function Layout() {
   );
 
   return (
-    <div className={`min-h-screen flex transition-colors duration-200 ${darkTheme ? 'dark text-slate-100 bg-[#0B1220]' : 'text-slate-900 bg-[#F8F7F4]'}`}>
+    <div className={`min-h-screen flex transition-colors duration-200 ${theme === 'dark' || theme === 'electric' ? 'dark text-slate-100 bg-[#0B1220]' : 'text-slate-900 bg-[#F8F7F4]'}`}>
       
       {/* SIDEBAR */}
       <aside 
@@ -421,8 +423,11 @@ export default function Layout() {
       {/* MAIN CONTAINER */}
       <div className="flex-1 flex flex-col min-w-0 h-screen overflow-hidden">
         
+        <IntelligenceRibbon />
+        <CommandPalette isOpen={showCommandPalette} onClose={() => setShowCommandPalette(false)} />
+
         {/* HEADER */}
-        <header className="h-16 border-b border-[#E7E5E4] dark:border-[#273449] bg-white/80 dark:bg-[#111827]/80 backdrop-blur-md flex items-center justify-between px-6 z-20 sticky top-0">
+        <header className="h-16 border-b border-[#E7E5E4] dark:border-[#273449] bg-white/80 dark:bg-[#111827]/80 backdrop-blur-md flex items-center justify-between px-6 z-20 shrink-0">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -522,9 +527,9 @@ export default function Layout() {
             <button 
               onClick={toggleTheme}
               className="p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 transition-colors cursor-pointer"
-              title="Toggle Theme"
+              title={`Toggle Theme (Current: ${theme})`}
             >
-              {darkTheme ? <Sun size={18} /> : <Moon size={18} />}
+              {theme === 'dark' ? <Sun size={18} /> : theme === 'electric' ? <Zap size={18} className="text-[var(--primary)]" /> : <Moon size={18} />}
             </button>
 
             {/* DOWNLOAD EXPORT (IF ON REPORT PAGE) */}
